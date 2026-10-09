@@ -1689,6 +1689,8 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../SmartTubeIOS;
 		};
+			isa = XCLocalSwiftPackageReference;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1710,6 +1712,8 @@
 		B8401470D9A590E7F3685830 /* SmartTubeIOS */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SmartTubeIOS;
+		};
+			isa = XCSwiftPackageProductDependency;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
