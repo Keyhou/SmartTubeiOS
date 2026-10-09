@@ -15,10 +15,10 @@ default:
 
 # --- quality gates ---------------------------------------------------------
 format:
-    xcrun swift-format format --in-place --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
+    xcrun swift-format format --in-place --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube" {{casio}}/Sources {{casio}}/Tests
 
 format-check:
-    xcrun swift-format lint --strict --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
+    xcrun swift-format lint --strict --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube" {{casio}}/Sources {{casio}}/Tests
 
 lint:
     cd {{root}} && swiftlint lint --strict --baseline .swiftlint.baseline --config .swiftlint.yml
