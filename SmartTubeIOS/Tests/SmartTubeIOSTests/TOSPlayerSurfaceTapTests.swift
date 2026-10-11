@@ -92,9 +92,65 @@ struct TOSPlayerSurfaceTapTests {
         #expect(js.exception == nil)
     }
 
+    @Test(
+        "Recorded iPad overlay surfaces toggle controls without changing playback",
+        arguments: ["mobileBackground", "mobileMiddle", "mobile", "video"])
+    func mobileSurfaceClicks(target: String) throws {
+        let js = try context()
+        js.evaluateScript("enableMobile(); fire('touchstart', \(target)); var end = fire('touchend', \(target));")
+        // YouTube must finish its touch cleanup before we consume the click.
+        #expect(js.evaluateScript("end.stopped")?.toBool() == false)
+        js.evaluateScript("fire('click', \(target)); fire('click', \(target));")
+        #expect(js.evaluateScript("video.paused")?.toBool() == false)
+        #expect(js.evaluateScript("messages.map(m => m.controlsVisible).join(',')")?.toString() == "false,true")
+        #expect(js.evaluateScript("mobile.classList.contains('fadein')")?.toBool() == true)
+        #expect(js.exception == nil)
+    }
+
+    @Test("Mobile controls remain usable and deliberate pauses survive surface taps")
+    func mobileButtons() throws {
+        let js = try context()
+        js.evaluateScript("enableMobile(); fire('click', playButton); fire('click', mobileBackground);")
+        #expect(js.evaluateScript("video.paused")?.toBool() == true)
+        #expect(js.evaluateScript("messages.length")?.toInt32() == 1)
+        js.evaluateScript("fire('click', scrubber); fire('click', menu); fire('click', link);")
+        #expect(js.evaluateScript("messages.length")?.toInt32() == 1)
+        #expect(js.exception == nil)
+    }
+
+    @Test("Revealed mobile controls auto-hide and notify the native toolbar")
+    func mobileAutoHide() throws {
+        let js = try context()
+        js.evaluateScript(
+            "enableMobile(); fire('click', mobileBackground); fire('click', mobileBackground); runTimers();")
+        #expect(js.evaluateScript("mobile.classList.contains('fadein')")?.toBool() == false)
+        #expect(js.evaluateScript("messages.map(m => m.controlsVisible).join(',')")?.toString() == "false,true,false")
+        #expect(js.evaluateScript("video.paused")?.toBool() == false)
+    }
+
     private static let fixture = """
         var listeners = {}, messages = [], downstreamCalls = 0;
         var video = {readyState: 4, ended: false, paused: false, matches: () => true};
+        var mobile = null, mobileBackground, mobileMiddle, mobileVisible = true;
+        var timers = {}, nextTimer = 0;
+        function setTimeout(fn) { timers[++nextTimer] = fn; return nextTimer; }
+        function clearTimeout(id) { delete timers[id]; }
+        function runTimers() { var pending = timers; timers = {}; Object.values(pending).forEach(fn => fn()); }
+        function enableMobile() {
+            mobile = {
+                matches: selector => selector.includes('#player-control-overlay'),
+                contains: target => [mobile, mobileBackground, mobileMiddle, playButton, scrubber, menu, link].includes(target),
+                classList: {
+                    contains: name => name === 'fadein' && mobileVisible,
+                    toggle: (name, value) => { if (name === 'fadein') mobileVisible = value; },
+                    remove: name => { if (name === 'fadein') mobileVisible = false; }
+                }
+            };
+            // These are siblings of movie_player on the physical iPad, not
+            // descendants of its video container (the original missed case).
+            mobileBackground = {matches: selector => selector.includes('.player-controls-background')};
+            mobileMiddle = {matches: selector => selector.includes('.player-controls-middle')};
+        }
         var playButton = {matches: () => false};
         var scrubber = {matches: () => false};
         var menu = {matches: () => false};
@@ -110,7 +166,7 @@ struct TOSPlayerSurfaceTapTests {
         };
         var document = {
             fullscreenElement: null,
-            getElementById: () => player,
+            getElementById: id => id === 'movie_player' ? player : id === 'player-control-overlay' ? mobile : null,
             addEventListener: (type, handler) => { listeners[type] = handler; }
         };
         var window = {__nativeYTCallback: {postMessage: body => messages.push(JSON.parse(body))}};
@@ -126,7 +182,7 @@ struct TOSPlayerSurfaceTapTests {
             if (listeners[type]) listeners[type](event);
             if (!event.stopped && (type === 'click' || type === 'touchend')) {
                 downstreamCalls++;
-                if (target === video || target === playButton) video.paused = !video.paused;
+                if (target === playButton || ((target === video || target === mobileBackground || target === mobileMiddle) && (!mobile || type === 'click'))) video.paused = !video.paused;
             }
             return event;
         }
