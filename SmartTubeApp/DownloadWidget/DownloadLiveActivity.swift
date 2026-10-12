@@ -138,7 +138,6 @@ struct SmartTubeDownloadWidgetBundle: WidgetBundle {
         // A widget extension needs at least one StaticConfiguration widget, or SpringBoard
         // fails with "Failed to get descriptors for extensionBundleID". The Home widget is it.
         HomeFeedWidget()
-        // remove this line and the package dependency to drop it.
         #if ENABLE_DOWNLOADS
         DownloadLiveActivityWidget()
         #endif

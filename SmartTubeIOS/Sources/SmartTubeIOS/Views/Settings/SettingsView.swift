@@ -47,9 +47,6 @@ public struct SettingsView: View {
             sponsorBlockSection
             deArrowSection
             parentalControlsSection
-            #if os(iOS)
-            WidgetStepsSection()
-            #endif
             #if os(macOS)
             experimentalSection
             #endif

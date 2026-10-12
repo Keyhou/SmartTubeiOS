@@ -317,10 +317,6 @@ struct AppEntry: App {
                             browseViewModel.refreshIfStale()
                             consumePendingRSSFeedURL()
                             #if os(iOS)
-                            // The step widget catches up (Health is readable now); the first
-                            // time, Health is asked for access.
-                            #endif
-                            #if os(iOS)
                             consumePendingWatchLaterID()
                             consumePendingQueueVideoID()
                             if playerStateStore.presentation == .miniPlayer {
