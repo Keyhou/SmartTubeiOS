@@ -55,7 +55,7 @@ extension PlaybackViewModel {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     do {
-                        try AVAudioSession.sharedInstance().setActive(true)
+                        try await AVAudioSession.sharedInstance().activateForPlayback()
                     } catch {
                         playerLog.error("[interruption] setActive failed: \(error.localizedDescription)")
                     }
@@ -221,6 +221,85 @@ extension PlaybackViewModel {
     /// synchronous on the main thread.
     private func setNowPlayingInfo(_ info: [String: Any]?) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+/// AVAudioSession helpers that avoid main-thread hangs (#1784).
+///
+/// Thread Performance Checker flags `setActive` / `setCategory` when invoked on
+/// the main thread. iOS 27+ provides non-blocking `activate`/`deactivate` that
+/// are safe to call from `@MainActor`. Pre-iOS 27 must hop off the main actor
+/// via `@concurrent` free functions — never `@concurrent` *instance* methods on
+/// `AVAudioSession`, which would send a non-`Sendable` receiver across isolation.
+enum PlaybackAudioSession {
+    /// Activates the shared session for playback.
+    static func activate() async throws {
+        if #available(iOS 27, tvOS 27, *) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                AVAudioSession.sharedInstance().activate(options: []) { _, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+        } else {
+            try await setActiveOffMain(true)
+        }
+    }
+
+    /// Sets `.playback` / `.moviePlayback` then activates. `setCategory` blocks
+    /// while the session is already active, so it always runs off the main actor.
+    static func configureMoviePlayback() async throws {
+        try await setMoviePlaybackCategoryOffMain()
+        try await activate()
+    }
+
+    /// Deactivates and notifies other apps (mini-player dismiss / stop).
+    static func deactivateNotifyingOthers() async throws {
+        if #available(iOS 27, tvOS 27, *) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { _, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+        } else {
+            try await setActiveOffMain(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    @concurrent
+    private static func setActiveOffMain(
+        _ active: Bool,
+        options: AVAudioSession.SetActiveOptions = []
+    ) async throws {
+        if active {
+            try AVAudioSession.sharedInstance().setActive(true)
+        } else {
+            try AVAudioSession.sharedInstance().setActive(false, options: options)
+        }
+    }
+
+    @concurrent
+    private static func setMoviePlaybackCategoryOffMain() async throws {
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+    }
+}
+
+extension AVAudioSession {
+    /// Activates the shared session without blocking the main thread (#1784).
+    func activateForPlayback() async throws {
+        try await PlaybackAudioSession.activate()
+    }
+
+    /// Sets the movie-playback category and activates without blocking the main thread.
+    func configureMoviePlayback() async throws {
+        try await PlaybackAudioSession.configureMoviePlayback()
     }
 }
 #endif

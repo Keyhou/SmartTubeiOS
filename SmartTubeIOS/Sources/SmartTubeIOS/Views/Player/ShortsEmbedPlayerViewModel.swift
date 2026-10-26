@@ -230,10 +230,12 @@ final class ShortsEmbedPlayerViewModel: NSObject {
     }
 
     deinit {
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "ytCallback",
-            contentWorld: .page
-        )
+        MainActor.assumeIsolated {
+            webView.configuration.userContentController.removeScriptMessageHandler(
+                forName: "ytCallback",
+                contentWorld: .page
+            )
+        }
     }
 
     // MARK: - Settings update
@@ -290,7 +292,7 @@ final class ShortsEmbedPlayerViewModel: NSObject {
             // doc comment for syncYouTubeCookiesIntoWKWebView).
             Task { @MainActor in
                 await self.syncYouTubeCookiesIntoWKWebView()
-                self.startEmbed(videoId: video.id)
+                await self.startEmbed(videoId: video.id)
             }
         }
 
@@ -345,10 +347,10 @@ final class ShortsEmbedPlayerViewModel: NSObject {
     /// `webView.loadHTMLString`. Mirrors `TOSPlayerViewModel.loadEmbed`
     /// (TOSPlayerViewModel.swift:392-453), using `ShortsEmbedURL` (Task 2) instead of
     /// duplicating the URL/HTML construction.
-    private func startEmbed(videoId: String) {
+    private func startEmbed(videoId: String) async {
         #if os(iOS)
         do {
-            try AVAudioSession.sharedInstance().setActive(true)
+            try await AVAudioSession.sharedInstance().activateForPlayback()
         } catch {
             shortsLog.error(
                 "[\(self.logTag, privacy: .public)] [audioSession] setActive(true) failed: \(error.localizedDescription, privacy: .public)"

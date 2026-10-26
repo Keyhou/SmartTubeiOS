@@ -4,8 +4,28 @@ import CoreFoundation
 import WebKit
 import os
 import SmartTubeIOSCore
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 private let tosLog = Logger(subsystem: "com.void.smarttube.app", category: "TOSPlayer")
+
+#if os(macOS)
+private func snapshotPNGData(_ image: NSImage?) -> Data? {
+    guard let image else { return nil }
+    var proposedRect = CGRect(origin: .zero, size: image.size)
+    guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+        return nil
+    }
+    return NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
+}
+#else
+private func snapshotPNGData(_ image: UIImage?) -> Data? {
+    image?.pngData()
+}
+#endif
 
 // MARK: - JS Message Handling
 //
@@ -336,7 +356,7 @@ extension TOSPlayerViewModel {
         try? FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
 
         webView.takeSnapshot(with: nil) { [weak self] image, error in
-            guard let self else {
+            guard self != nil else {
                 completion?(false)
                 CFNotificationCenterPostNotification(
                     CFNotificationCenterGetDarwinNotifyCenter(),
@@ -355,7 +375,7 @@ extension TOSPlayerViewModel {
                 )
                 return
             }
-            guard let image = image, let data = image.pngData() else {
+            guard let data = snapshotPNGData(image) else {
                 tosLog.error("[snapshot] no image/PNG data returned")
                 completion?(false)
                 CFNotificationCenterPostNotification(

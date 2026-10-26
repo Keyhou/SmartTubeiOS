@@ -232,7 +232,7 @@ public struct TOSPlayerView: View {
                     // MARK: WKWebView layer
                     YouTubeWebPlayerView(
                         webView: vm.webView,
-                        onWindowReady: { [weak vm] in
+                        onWindowReady: {
                             // Defer the IFrame load until the WKWebView is actually
                             // in a visible window. The cover-present animation that
                             // brings the TOS player onto screen (triggered by the
@@ -243,7 +243,7 @@ public struct TOSPlayerView: View {
                             // times out → error 153 every time. Waiting for the
                             // window-ready callback ensures the IFrame loads
                             // against a visible page.
-                            vm?.startIfNeededWhenWindowReady()
+                            vm.startIfNeededWhenWindowReady()
                         }
                     )
                     .ignoresSafeArea()
@@ -976,9 +976,17 @@ public struct TOSPlayerView: View {
 #if os(macOS)
 private struct YouTubeWebPlayerView: NSViewRepresentable {
     let webView: WKWebView
+    /// Same contract as the iOS representable: load the IFrame only after the
+    /// view exists. `startIfNeeded()` is a no-op, so skipping this callback
+    /// leaves the macOS player black. The view model's own delay covers the
+    /// presentation, matching `makeUIView`.
+    let onWindowReady: (() -> Void)?
 
     func makeNSView(context: Context) -> WKWebView {
         webView.autoresizingMask = [.width, .height]
+        if let onWindowReady {
+            DispatchQueue.main.async { onWindowReady() }
+        }
         return webView
     }
 

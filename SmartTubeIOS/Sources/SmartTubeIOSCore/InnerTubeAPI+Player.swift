@@ -309,7 +309,7 @@ extension InnerTubeAPI {
             ("web-auth", { try await self.fetchPlayerInfoWebAuthenticated(videoId: videoId) }),
             ("ios-auth", { try await self.fetchPlayerInfoiOSAuthenticated(videoId: videoId) }),
         ]
-        for (client, fetch) in clients {
+        for (_, fetch) in clients {
             do {
                 let info = try await fetch()
                 if let urls = info.trackingURLs,

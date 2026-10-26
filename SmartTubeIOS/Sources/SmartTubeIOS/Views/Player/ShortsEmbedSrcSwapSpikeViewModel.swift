@@ -118,10 +118,12 @@ final class ShortsEmbedSrcSwapSpikeViewModel: NSObject {
     }
 
     deinit {
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "ytCallback",
-            contentWorld: .page
-        )
+        MainActor.assumeIsolated {
+            webView.configuration.userContentController.removeScriptMessageHandler(
+                forName: "ytCallback",
+                contentWorld: .page
+            )
+        }
     }
 
     // MARK: - Lifecycle

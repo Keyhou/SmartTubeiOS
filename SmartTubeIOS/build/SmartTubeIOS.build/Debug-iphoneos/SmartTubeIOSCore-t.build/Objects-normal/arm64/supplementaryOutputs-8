@@ -1,0 +1,51 @@
+{
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/SponsorBlockDecisionEngine.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockDecisionEngine.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockDecisionEngine.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockDecisionEngine.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockDecisionEngine.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockDecisionEngine.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/SponsorBlockService.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockService.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockService.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockService.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockService.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockService.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/SponsorBlockSkipManager.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockSkipManager.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockSkipManager.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockSkipManager.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockSkipManager.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/SponsorBlockSkipManager.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/TTLCache.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TTLCache.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TTLCache.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TTLCache.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TTLCache.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TTLCache.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/TimeFormatting.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TimeFormatting.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TimeFormatting.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TimeFormatting.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TimeFormatting.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TimeFormatting.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/TokenManager.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TokenManager.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TokenManager.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TokenManager.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TokenManager.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/TokenManager.swiftdeps"
+  },
+  "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/Sources/SmartTubeIOSCore/URLVideoResolver.swift" : {
+    "const-values" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/URLVideoResolver.swiftconstvalues",
+    "dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/URLVideoResolver.d",
+    "diagnostics" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/URLVideoResolver.dia",
+    "object" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/URLVideoResolver.o",
+    "swift-dependencies" : "/Users/keyhanmortezaeifar/Developer/SmartTubeiOS/SmartTubeIOS/build/SmartTubeIOS.build/Debug-iphoneos/SmartTubeIOSCore-t.build/Objects-normal/arm64/URLVideoResolver.swiftdeps"
+  }
+}

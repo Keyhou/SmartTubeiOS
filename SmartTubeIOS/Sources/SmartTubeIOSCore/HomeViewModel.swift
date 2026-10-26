@@ -267,8 +267,8 @@ public final class HomeViewModel {
             )
             // Keep paging Shorts content in the background toward preloadMoreShorts's
             // higher threshold, without delaying the load completion above.
-            shortsPreloadTask = Task { @MainActor [weak self] in
-                await self?.preloadMoreShorts()
+            shortsPreloadTask = Task { @MainActor in
+                await self.preloadMoreShorts()
             }
         }
     }

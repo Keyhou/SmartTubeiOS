@@ -416,12 +416,10 @@ public final class PlaybackViewModel {
     // read-modify-write while MediaPlayer is processing on its accessQueue
     // causes EXC_BREAKPOINT. Mirror the dict locally instead.
     @ObservationIgnored var nowPlayingInfoCache: [String: Any] = [:]
-    // Cached thumbnail for MPMediaItemArtwork. Written from a background URLSession task;
-    // read from MediaPlayer's internal artwork-closure thread. nonisolated(unsafe) is
-    // intentional: UIImage is immutable after creation and the worst-case race is that
-    // MediaPlayer gets nil on the first render (it will retry on the next state update).
+    // Cached thumbnail for MPMediaItemArtwork. The artwork closure receives a
+    // snapshot by value, and this cache is only read and written on the main actor.
     #if canImport(UIKit)
-    nonisolated(unsafe) var cachedArtwork: UIImage? = nil
+    @ObservationIgnored var cachedArtwork: UIImage? = nil
     @ObservationIgnored var cachedArtworkVideoID: String? = nil
     #endif
 
@@ -465,10 +463,12 @@ public final class PlaybackViewModel {
         #if canImport(UIKit)
         do {
             // Only configure the audio category at init time. setActive(true) is
-            // deliberately deferred to loadAsync (PlaybackViewModel+Loading.swift ~line 494)
+            // deliberately deferred to loadAsync (PlaybackViewModel+Loading.swift)
             // so that cold-launching the app does not interrupt background audio from
             // other apps before the user starts a video (GitHub issue #54).
             // setCategory alone does not interrupt other apps per AVAudioSession docs.
+            // Session is inactive here, so the SessionCore "while active" hang does
+            // not apply; keep this synchronous so loadAsync cannot race category setup.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         } catch {
             playerLog.error("AVAudioSession category setup failed: \(error.localizedDescription)")

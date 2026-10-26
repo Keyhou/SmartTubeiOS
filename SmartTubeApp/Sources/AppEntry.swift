@@ -4,6 +4,7 @@ import SmartTubeIOS
 import SmartTubeIOSCore
 import SwiftUI
 import os
+
 #if os(iOS)
 import CoreSpotlight
 #endif
@@ -45,7 +46,6 @@ struct AppEntry: App {
     }
     #endif
 
-    private static let appGroup = "group.com.void.smarttube"
     private static let pendingKey = "pendingVideoID"
     private static let pendingWatchLaterKey = "pendingWatchLaterVideoID"
     private static let pendingQueueKey = "pendingQueueVideoID"
@@ -150,7 +150,7 @@ struct AppEntry: App {
                 .environment(settingsStore)
                 .environment(\.innerTubeAPI, api)
                 #if ENABLE_DOWNLOADS
-                .environment(cardDownloadService)
+            .environment(cardDownloadService)
                 #endif
                 .onChange(of: authService.accessToken, initial: true) { _, newToken in
                     Task {
@@ -207,7 +207,7 @@ struct AppEntry: App {
                 .environment(settingsStore)
                 .environment(\.innerTubeAPI, api)
                 #if ENABLE_DOWNLOADS
-                .environment(cardDownloadService)
+            .environment(cardDownloadService)
                 #endif
                 .onChange(of: authService.accessToken, initial: true) { _, newToken in
                     Task {
@@ -240,7 +240,7 @@ struct AppEntry: App {
                     .environment(\.innerTubeAPI, api)
                     .environment(playerStateStore)
                     #if ENABLE_DOWNLOADS
-                    .environment(cardDownloadService)
+                .environment(cardDownloadService)
                     #endif
             } else {
                 RootView()
@@ -249,93 +249,93 @@ struct AppEntry: App {
                     .environment(settingsStore)
                     .environment(\.innerTubeAPI, api)
                     #if ENABLE_DOWNLOADS
-                    .environment(cardDownloadService)
+                .environment(cardDownloadService)
                     #endif
                     #if os(iOS)
                 .environment(playerStateStore)
                 .environment(tosPlayerStateStore)
                 .environment(playerRouter)
-                    #endif
-                    .onChange(of: authService.accessToken, initial: true) { _, newToken in
-                        #if os(iOS)
-                        playerStateStore.vm.updateAuthToken(newToken)
-                        #endif
-                        Task {
-                            await api.setAuthToken(newToken)
-                            await browseViewModel.updateAuthToken(newToken)
-                        }
-                    }
-                    .onChange(of: authService.sapisid, initial: true) { _, newSapisid in
-                        #if os(iOS)
-                        playerStateStore.vm.updateSAPISID(newSapisid)
-                        #endif
-                        Task { await api.setSAPISID(newSapisid) }
-                    }
-                    .onChange(of: settingsStore.settings.enabledSections) { _, newSections in
-                        browseViewModel.configureSections(newSections)
-                    }
-                    .onChange(of: settingsStore.settings.historyState, initial: true) { _, newState in
-                        browseViewModel.updateHistoryEnabled(newState == .enabled)
-                    }
-                    .onChange(of: settingsStore.settings.perDeviceRecommendationsEnabled) { _, enabled in
-                        Task {
-                            if !enabled { await api.resetVisitorData() }
-                            browseViewModel.loadContent(refresh: true, source: "perDeviceRecommendationsChanged")
-                        }
-                    }
-                    .onOpenURL { url in handleOpenURL(url) }
+                #endif
+                .onChange(of: authService.accessToken, initial: true) { _, newToken in
                     #if os(iOS)
-                    // Spotlight: tapping a video or channel result opens it.
-                    .onContinueUserActivity(CSSearchableItemActionType) { activity in
-                        guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
-                            let route = SpotlightIndexer.route(forIdentifier: id)
-                        else { return }
-                        handleOpenURL(route.url)
-                    }
-                    // Spotlight: recently watched videos (removed when history is off or cleared)
-                    // and subscribed channels (removed on sign-out).
-                    .onChange(of: LocalWatchHistoryStore.shared.entries.map(\.video.id), initial: true) { _, _ in
-                        syncSpotlightHistory()
-                    }
-                    .onChange(of: settingsStore.settings.historyState) { _, _ in syncSpotlightHistory() }
-                    .onChange(of: browseViewModel.subscribedChannels) { _, channels in
-                        if !channels.isEmpty { SpotlightIndexer.shared.syncChannels(channels) }
-                    }
-                    .onChange(of: authService.isSignedIn) { _, signedIn in
-                        if !signedIn { SpotlightIndexer.shared.syncChannels([]) }
-                    }
+                    playerStateStore.vm.updateAuthToken(newToken)
                     #endif
-                    .onChange(of: scenePhase, initial: true) { _, phase in
-                        if phase == .active {
-                            consumePendingVideoID()
-                            consumePendingVideoFromLaunchArgs()
-                            consumeDeepLinkFromLaunchArgs()
-                            consumeChannelDeepLinkFromLaunchArgs()
-                            consumeQueueInjectFromLaunchArgs()
-                            consumeBotGuardProbeFromLaunchArgs()
-                            authService.handleForeground()
-                            browseViewModel.refreshIfStale()
-                            consumePendingRSSFeedURL()
-                            #if os(iOS)
-                            consumePendingWatchLaterID()
-                            consumePendingQueueVideoID()
-                            if playerStateStore.presentation == .miniPlayer {
-                                playerStateStore.vm.handleForeground()
-                            }
-                            #endif
-                        } else if phase == .background {
-                            #if os(iOS)
-                            if playerStateStore.presentation == .miniPlayer {
-                                playerStateStore.vm.handleBackground()
-                            }
-                            #endif
-                        }
+                    Task {
+                        await api.setAuthToken(newToken)
+                        await browseViewModel.updateAuthToken(newToken)
                     }
-                    .onAppear {
-                        enableShortsIfNeeded()
-                        signOutIfNeeded()
-                    }
+                }
+                .onChange(of: authService.sapisid, initial: true) { _, newSapisid in
                     #if os(iOS)
+                    playerStateStore.vm.updateSAPISID(newSapisid)
+                    #endif
+                    Task { await api.setSAPISID(newSapisid) }
+                }
+                .onChange(of: settingsStore.settings.enabledSections) { _, newSections in
+                    browseViewModel.configureSections(newSections)
+                }
+                .onChange(of: settingsStore.settings.historyState, initial: true) { _, newState in
+                    browseViewModel.updateHistoryEnabled(newState == .enabled)
+                }
+                .onChange(of: settingsStore.settings.perDeviceRecommendationsEnabled) { _, enabled in
+                    Task {
+                        if !enabled { await api.resetVisitorData() }
+                        browseViewModel.loadContent(refresh: true, source: "perDeviceRecommendationsChanged")
+                    }
+                }
+                .onOpenURL { url in handleOpenURL(url) }
+                #if os(iOS)
+                // Spotlight: tapping a video or channel result opens it.
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                        let route = SpotlightIndexer.route(forIdentifier: id)
+                    else { return }
+                    handleOpenURL(route.url)
+                }
+                // Spotlight: recently watched videos (removed when history is off or cleared)
+                // and subscribed channels (removed on sign-out).
+                .onChange(of: LocalWatchHistoryStore.shared.entries.map(\.video.id), initial: true) { _, _ in
+                    syncSpotlightHistory()
+                }
+                .onChange(of: settingsStore.settings.historyState) { _, _ in syncSpotlightHistory() }
+                .onChange(of: browseViewModel.subscribedChannels) { _, channels in
+                    if !channels.isEmpty { SpotlightIndexer.shared.syncChannels(channels) }
+                }
+                .onChange(of: authService.isSignedIn) { _, signedIn in
+                    if !signedIn { SpotlightIndexer.shared.syncChannels([]) }
+                }
+                #endif
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    if phase == .active {
+                        consumePendingVideoID()
+                        consumePendingVideoFromLaunchArgs()
+                        consumeDeepLinkFromLaunchArgs()
+                        consumeChannelDeepLinkFromLaunchArgs()
+                        consumeQueueInjectFromLaunchArgs()
+                        consumeBotGuardProbeFromLaunchArgs()
+                        authService.handleForeground()
+                        browseViewModel.refreshIfStale()
+                        consumePendingRSSFeedURL()
+                        #if os(iOS)
+                        consumePendingWatchLaterID()
+                        consumePendingQueueVideoID()
+                        if playerStateStore.presentation == .miniPlayer {
+                            playerStateStore.vm.handleForeground()
+                        }
+                        #endif
+                    } else if phase == .background {
+                        #if os(iOS)
+                        if playerStateStore.presentation == .miniPlayer {
+                            playerStateStore.vm.handleBackground()
+                        }
+                        #endif
+                    }
+                }
+                .onAppear {
+                    enableShortsIfNeeded()
+                    signOutIfNeeded()
+                }
+                #if os(iOS)
                 .alert(item: $watchLaterAlert) { item in
                     Alert(
                         title: Text(item.title),
@@ -376,7 +376,8 @@ struct AppEntry: App {
             NotificationCenter.default.post(name: .smartTubeOpenSearch, object: nil, userInfo: ["query": query])
         case .section(let type):
             leaveFullScreenPlayer()
-            NotificationCenter.default.post(name: .smartTubeOpenSection, object: nil, userInfo: ["section": type.rawValue])
+            NotificationCenter.default.post(
+                name: .smartTubeOpenSection, object: nil, userInfo: ["section": type.rawValue])
         case .playWatchLater:
             Task { @MainActor in
                 // Needs a signed-in account; otherwise show the Watch Later section, which
@@ -420,7 +421,7 @@ struct AppEntry: App {
         // this video on the next cold start. When the app is already active, scenePhase
         // never transitions to .active, so the onChange handler never fires —
         // handleOpenURL is the only thing that runs, and it must clean up the key itself.
-        if let defaults = UserDefaults(suiteName: Self.appGroup) {
+        if let defaults = UserDefaults(suiteName: HomeWidgetStore.appGroup) {
             defaults.removeObject(forKey: Self.pendingKey)
             defaults.synchronize()
         }
@@ -448,7 +449,7 @@ struct AppEntry: App {
 
     @MainActor
     private func consumePendingVideoID() {
-        guard let defaults = UserDefaults(suiteName: Self.appGroup),
+        guard let defaults = UserDefaults(suiteName: HomeWidgetStore.appGroup),
             let videoID = defaults.string(forKey: Self.pendingKey),
             !videoID.isEmpty
         else { return }
@@ -463,7 +464,7 @@ struct AppEntry: App {
     #if os(iOS)
     @MainActor
     private func consumePendingWatchLaterID() {
-        guard let defaults = UserDefaults(suiteName: Self.appGroup),
+        guard let defaults = UserDefaults(suiteName: HomeWidgetStore.appGroup),
             let videoID = defaults.string(forKey: Self.pendingWatchLaterKey),
             !videoID.isEmpty
         else { return }
@@ -500,7 +501,7 @@ struct AppEntry: App {
 
     @MainActor
     private func consumePendingQueueVideoID() {
-        guard let defaults = UserDefaults(suiteName: Self.appGroup),
+        guard let defaults = UserDefaults(suiteName: HomeWidgetStore.appGroup),
             let videoID = defaults.string(forKey: Self.pendingQueueKey),
             !videoID.isEmpty
         else { return }
@@ -517,7 +518,7 @@ struct AppEntry: App {
 
     @MainActor
     private func consumePendingRSSFeedURL() {
-        guard let defaults = UserDefaults(suiteName: Self.appGroup),
+        guard let defaults = UserDefaults(suiteName: HomeWidgetStore.appGroup),
             let urlString = defaults.string(forKey: Self.pendingRSSFeedKey),
             !urlString.isEmpty,
             let feedURL = URL(string: urlString)

@@ -238,10 +238,9 @@ final class TOSPlayerViewModel: NSObject {
 
     #if os(iOS)
     @ObservationIgnored var nowPlayingInfoCache: [String: Any] = [:]
-    /// `nonisolated(unsafe)` so MPMediaItemArtwork's requestHandler closure (invoked
-    /// on MediaPlayer's private serial queue) can read it without a Swift 6
-    /// actor-isolation assertion — mirrors PlaybackViewModel.cachedArtwork exactly.
-    nonisolated(unsafe) var cachedArtwork: UIImage? = nil
+    /// Mirrors `PlaybackViewModel.cachedArtwork`. The artwork closure receives a
+    /// snapshot by value; this cache stays on the main actor.
+    @ObservationIgnored var cachedArtwork: UIImage? = nil
     @ObservationIgnored var cachedArtworkVideoID: String? = nil
     #endif
 
@@ -448,23 +447,23 @@ final class TOSPlayerViewModel: NSObject {
                 tosLog.notice("[vm] asyncAfter fired but self is nil — skipping")
                 return
             }
-            tosLog.notice(
-                "[vm] asyncAfter fired, webView isNil=\(self.webView == nil), calling loadEmbed directly (no Task wrapper)"
-            )
+            tosLog.notice("[vm] asyncAfter fired, calling loadEmbed directly (no Task wrapper)")
             Task { @MainActor in
                 await self.syncYouTubeCookiesIntoWKWebView()
                 tosLog.notice("[vm] cookies synced, calling loadEmbed")
-                self.loadEmbed(videoId: self.videoId, startTime: self.startTime)
+                await self.loadEmbed(videoId: self.videoId, startTime: self.startTime)
                 tosLog.notice("[vm] loadEmbed returned")
             }
         }
     }
 
     deinit {
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: "ytCallback",
-            contentWorld: .page
-        )
+        MainActor.assumeIsolated {
+            webView.configuration.userContentController.removeScriptMessageHandler(
+                forName: "ytCallback",
+                contentWorld: .page
+            )
+        }
     }
 
     // MARK: - Settings update
@@ -696,7 +695,7 @@ final class TOSPlayerViewModel: NSObject {
         tosLog.notice("[loadEmbed] syncYouTubeCookiesIntoWKWebView: done")
     }
 
-    private func loadEmbed(videoId: String, startTime: Double) {
+    private func loadEmbed(videoId: String, startTime: Double) async {
         // TOSPlayerViewModel never instantiates PlaybackViewModel (PlayerRouter
         // routes TOS and AVPlayer pipelines exclusively), so nothing else in the TOS
         // pipeline activates the audio session. Without this, WKWebView's media
@@ -706,9 +705,10 @@ final class TOSPlayerViewModel: NSObject {
         // Same .playback/.moviePlayback category PlaybackViewModel uses — more
         // correct than leaving the category unset, though confirmed (#283) this
         // alone does not make TOS audio survive backgrounding; see task-283.
+        // Category and activation both enter the audio server on the calling
+        // thread; configureMoviePlayback runs that work off the main actor.
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-            try AVAudioSession.sharedInstance().setActive(true)
+            try await AVAudioSession.sharedInstance().configureMoviePlayback()
         } catch {
             tosLog.error("[audioSession] setCategory/setActive failed: \(error.localizedDescription, privacy: .public)")
         }

@@ -99,16 +99,23 @@ extension PlaybackViewModel {
                 }
             }
             #if canImport(UIKit)
-            do {
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                playerLog.error("[fix12] AVAudioSession setActive failed: \(error.localizedDescription)")
+            // Activate off the main-thread hang path (#1784), then resume.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    try await AVAudioSession.sharedInstance().activateForPlayback()
+                } catch {
+                    playerLog.error("[fix12] AVAudioSession setActive failed: \(error.localizedDescription)")
+                }
+                self.setupRemoteCommandCenter()
+                UIApplication.shared.isIdleTimerDisabled = true
+                self.player.rate = Float(self.settings.playbackSpeed)
+                self.isPlaying = true
             }
-            setupRemoteCommandCenter()
-            UIApplication.shared.isIdleTimerDisabled = true
-            #endif
+            #else
             player.rate = Float(settings.playbackSpeed)
             isPlaying = true
+            #endif
             return
         }
         // Different video or parked item expired — clear parked state and tear down old item.
@@ -254,19 +261,27 @@ extension PlaybackViewModel {
     public func handleForeground() {
         guard player.currentItem != nil else { return }
         #if canImport(UIKit)
-        do {
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            playerLog.error("AVAudioSession reactivation failed: \(error.localizedDescription)")
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await AVAudioSession.sharedInstance().activateForPlayback()
+            } catch {
+                playerLog.error("AVAudioSession reactivation failed: \(error.localizedDescription)")
+            }
+            // Resume only if we consider ourselves to be in playing state.
+            // isPlaying is kept in sync with player.rate via KVO, so this only fires
+            // when the player was paused while still intending to play (e.g. background transition).
+            if self.isPlaying && self.player.rate == 0 {
+                self.player.rate = Float(self.settings.playbackSpeed)
+                playerLog.notice("[handleForeground] resumed player after foreground transition")
+            }
         }
-        #endif
-        // Resume only if we consider ourselves to be in playing state.
-        // isPlaying is kept in sync with player.rate via KVO, so this only fires
-        // when the player was paused while still intending to play (e.g. background transition).
+        #else
         if isPlaying && player.rate == 0 {
             player.rate = Float(settings.playbackSpeed)
             playerLog.notice("[handleForeground] resumed player after foreground transition")
         }
+        #endif
     }
 
     /// Call when the app enters the background.
@@ -390,7 +405,7 @@ extension PlaybackViewModel {
         // during which PlayerRemoteXPC reports err=-12860/-12785 and the widget is absent.
         setupRemoteCommandCenter()
         do {
-            try AVAudioSession.sharedInstance().setActive(true)
+            try await AVAudioSession.sharedInstance().activateForPlayback()
             playerLog.notice("[loadAsync] AVAudioSession activated early (lock-screen pre-seed)")
         } catch {
             playerLog.error("[loadAsync] early setActive failed: \(error.localizedDescription)")
@@ -558,7 +573,7 @@ extension PlaybackViewModel {
                 #if canImport(UIKit)
                 setupRemoteCommandCenter()
                 do {
-                    try AVAudioSession.sharedInstance().setActive(true)
+                    try await AVAudioSession.sharedInstance().activateForPlayback()
                 } catch {
                     playerLog.error("[loadAsync] local: AVAudioSession setActive failed: \(error.localizedDescription)")
                 }
@@ -923,8 +938,8 @@ extension PlaybackViewModel {
                             // Watch for the first valid value so the scrubber is not
                             // permanently greyed out (#183).
                             self.durationObserverTask?.cancel()
-                            self.durationObserverTask = Task { [weak self, weak item] in
-                                guard let self, let item else { return }
+                            self.durationObserverTask = Task { [weak self] in
+                                guard let self else { return }
                                 for await seconds in item.firstValidDurationStream {
                                     guard !Task.isCancelled else { return }
                                     let prev = self.duration
@@ -952,21 +967,21 @@ extension PlaybackViewModel {
                         // a hint update only — no item replacement, no stutter.
                         if info.hlsURL != nil {
                             let targetMaxH = self.settings.preferredQuality.maxHeight
-                            Task { [weak self, weak item] in
+                            Task { [weak self] in
                                 try? await Task.sleep(for: .milliseconds(800))
                                 guard let self, !Task.isCancelled else { return }
                                 self.timeToHighQualityMs = Int(Date().timeIntervalSince(self.videoLoadStartedAt) * 1000)
                                 // Reset to system default so scrubbing has a comfortable
                                 // forward buffer after the first frame is on screen.
-                                item?.preferredForwardBufferDuration = 0
+                                item.preferredForwardBufferDuration = 0
                                 if let h = targetMaxH {
                                     let hf = CGFloat(h)
-                                    item?.preferredMaximumResolution = CGSize(width: hf * 4, height: hf)
-                                    item?.preferredPeakBitRate = self.peakBitRate(for: h)
+                                    item.preferredMaximumResolution = CGSize(width: hf * 4, height: hf)
+                                    item.preferredPeakBitRate = self.peakBitRate(for: h)
                                     playerLog.notice("[fast-start] ABR ramp → \(h)p + buffer unconstrained")
                                 } else {
-                                    item?.preferredMaximumResolution = .zero
-                                    item?.preferredPeakBitRate = 0
+                                    item.preferredMaximumResolution = .zero
+                                    item.preferredPeakBitRate = 0
                                     playerLog.notice(
                                         "[fast-start] ABR ramp → Auto (unconstrained) + buffer unconstrained")
                                 }
@@ -1077,7 +1092,7 @@ extension PlaybackViewModel {
             // the session to other apps; without this call on the next load() the player
             // starts silently because AVFoundation cannot acquire the inactive session.
             do {
-                try AVAudioSession.sharedInstance().setActive(true)
+                try await AVAudioSession.sharedInstance().activateForPlayback()
                 playerLog.notice("[loadAsync] AVAudioSession activated before playback")
             } catch {
                 playerLog.error("[loadAsync] AVAudioSession setActive(true) failed: \(error.localizedDescription)")
@@ -1190,10 +1205,12 @@ extension PlaybackViewModel {
         parkedVideoId = currentVideo?.id
         isPlaying = false
         #if canImport(UIKit)
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            playerLog.error("AVAudioSession deactivation failed: \(error.localizedDescription)")
+        Task {
+            do {
+                try await PlaybackAudioSession.deactivateNotifyingOthers()
+            } catch {
+                playerLog.error("AVAudioSession deactivation failed: \(error.localizedDescription)")
+            }
         }
         #endif
         loadTask?.cancel()

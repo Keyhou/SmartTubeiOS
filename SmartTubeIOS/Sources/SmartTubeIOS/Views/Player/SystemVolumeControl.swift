@@ -1,6 +1,20 @@
 #if os(iOS)
 import MediaPlayer
+import ObjectiveC
 import SwiftUI
+
+/// Hides `MPVolumeView`'s AirPlay button. `showsRouteButton` is deprecated in
+/// favor of `AVRoutePickerView`, which does not drive system volume, so the
+/// setter is invoked directly.
+private func hideRouteButton(_ view: MPVolumeView) {
+    let selector = Selector(("setShowsRouteButton:"))
+    guard let method = class_getInstanceMethod(type(of: view), selector) else { return }
+    let setter = unsafeBitCast(
+        method_getImplementation(method),
+        to: (@convention(c) (AnyObject, Selector, Bool) -> Void).self
+    )
+    setter(view, selector, false)
+}
 
 // MARK: - SystemVolumeControl (#19)
 //
@@ -23,7 +37,7 @@ struct SystemVolumeControl: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MPVolumeView {
         let view = MPVolumeView(frame: .zero)
-        view.showsRouteButton = false
+        hideRouteButton(view)
         view.alpha = 0.001
         view.isUserInteractionEnabled = false
         context.coordinator.slider = view.subviews.compactMap { $0 as? UISlider }.first
