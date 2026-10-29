@@ -9,6 +9,12 @@ import UIKit
 
 private let controlsLog = CrashlyticsLogger(category: "Player")
 
+#if os(tvOS)
+private let centerControlSpacing: CGFloat = 64
+#else
+private let centerControlSpacing: CGFloat = 40
+#endif
+
 // MARK: - PlayerControlsOverlay
 //
 // Dedicated view for the interactive transport controls overlaid on the player.
@@ -40,6 +46,12 @@ struct PlayerControlsOverlay: View {
     #endif
     #if os(tvOS)
     @Binding var highlightedControl: PlayerView.TVPlayerControl?
+    var hudFocusEnabled: Bool = true
+    var onActivate: (PlayerView.TVPlayerControl) -> Void = { _ in }
+    var onMove: (MoveCommandDirection) -> Void = { _ in }
+    var onExit: () -> Void = {}
+    @FocusState private var focusedHUD: PlayerView.TVPlayerControl?
+    @Environment(AuthService.self) private var authService
     #endif
     @Environment(SettingsStore.self) var store
     @Environment(\.dismiss) var dismiss
@@ -48,14 +60,7 @@ struct PlayerControlsOverlay: View {
             // Top bar: back + title
             HStack {
                 #if os(tvOS)
-                tvOverlayControl(
-                    highlighted: highlightedControl == .back,
-                    scale: 1.5,
-                    shadowRadius: 12,
-                    identifier: "player.backButton",
-                    width: 64,
-                    height: 64
-                ) {
+                tvOverlayControl(.back, identifier: "player.backButton", width: 64, height: 64) {
                     Image(systemName: AppSymbol.chevronLeft)
                         .font(.title2)
                         .foregroundStyle(.white)
@@ -88,9 +93,7 @@ struct PlayerControlsOverlay: View {
                     let channelTitle = vm.playerInfo?.video.channelTitle ?? video.channelTitle
                     #if os(tvOS)
                     tvOverlayControl(
-                        highlighted: highlightedControl == .channel,
-                        scale: 1.5,
-                        shadowRadius: 12,
+                        .channel,
                         identifier: "player.channelName",
                         enabled: channelId?.isEmpty == false
                     ) {
@@ -153,16 +156,38 @@ struct PlayerControlsOverlay: View {
                     .frame(width: 40, height: 40)
                     .accessibilityIdentifier("player.airPlayButton")
                 #endif
-                // Share / Download menu
                 #if os(tvOS)
-                tvOverlayControl(
-                    highlighted: highlightedControl == .more,
-                    scale: 1.5,
-                    shadowRadius: 12,
-                    identifier: "player.moreButton",
-                    width: 64,
-                    height: 64
-                ) {
+                if authService.isSignedIn {
+                    tvOverlayControl(.like, identifier: "player.likeButton", width: 64, height: 64) {
+                        Image(systemName: AppSymbol.thumbsUp)
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                    tvOverlayControl(.dislike, identifier: "player.dislikeButton", width: 64, height: 64) {
+                        Image(systemName: AppSymbol.thumbsDown)
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+                tvOverlayControl(.speed, identifier: "player.speedButton", height: 64) {
+                    Text(AppSettings.formattedSpeed(vm.settings.playbackSpeed, normalAsOneX: true))
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 56)
+                }
+                tvOverlayControl(.captions, identifier: "player.captionsButton", height: 64) {
+                    Text(vm.selectedCaption?.languageCode ?? "Off")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 56)
+                }
+                tvOverlayControl(.quality, identifier: "player.qualityButton", height: 64) {
+                    Text(vm.selectedFormat.map { "\($0.height)p" } ?? "Auto")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 64)
+                }
+                tvOverlayControl(.more, identifier: "player.moreButton", width: 64, height: 64) {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18 * controlScale))
                         .foregroundStyle(.white)
@@ -194,12 +219,11 @@ struct PlayerControlsOverlay: View {
             Spacer()
 
             // Centre: rewind / play-pause / forward
-            HStack(spacing: 40) {
+            HStack(spacing: centerControlSpacing) {
                 #if os(tvOS)
                 seekButton(
                     symbol: "gobackward.\(store.settings.seekBackSeconds)",
-                    seconds: -Double(store.settings.seekBackSeconds),
-                    tvHighlighted: highlightedControl == .seekBack)
+                    seconds: -Double(store.settings.seekBackSeconds))
                 #else
                 seekButton(
                     symbol: "gobackward.\(store.settings.seekBackSeconds)",
@@ -209,8 +233,7 @@ struct PlayerControlsOverlay: View {
                 #if os(tvOS)
                 seekButton(
                     symbol: "goforward.\(store.settings.seekForwardSeconds)",
-                    seconds: Double(store.settings.seekForwardSeconds),
-                    tvHighlighted: highlightedControl == .seekForward)
+                    seconds: Double(store.settings.seekForwardSeconds))
                 #else
                 seekButton(
                     symbol: "goforward.\(store.settings.seekForwardSeconds)",
@@ -242,9 +265,7 @@ struct PlayerControlsOverlay: View {
                     // Previous video button
                     #if os(tvOS)
                     tvOverlayControl(
-                        highlighted: highlightedControl == .prevVideo,
-                        scale: 1.55,
-                        shadowRadius: 14,
+                        .prevVideo,
                         identifier: "player.prevBtn",
                         enabled: vm.hasPrevious && !vm.isLoading,
                         width: 64,
@@ -276,9 +297,7 @@ struct PlayerControlsOverlay: View {
                     if !vm.chapters.isEmpty {
                         #if os(tvOS)
                         tvOverlayControl(
-                            highlighted: highlightedControl == .prevChapter,
-                            scale: 1.55,
-                            shadowRadius: 14,
+                            .prevChapter,
                             identifier: "player.prevChapterBtn",
                             enabled: vm.hasPreviousChapter && !vm.isLoading,
                             width: 64,
@@ -318,9 +337,7 @@ struct PlayerControlsOverlay: View {
                     if !vm.chapters.isEmpty {
                         #if os(tvOS)
                         tvOverlayControl(
-                            highlighted: highlightedControl == .nextChapter,
-                            scale: 1.55,
-                            shadowRadius: 14,
+                            .nextChapter,
                             identifier: "player.nextChapterBtn",
                             enabled: vm.hasNextChapter && !vm.isLoading,
                             width: 64,
@@ -378,9 +395,7 @@ struct PlayerControlsOverlay: View {
                     // Next video button
                     #if os(tvOS)
                     tvOverlayControl(
-                        highlighted: highlightedControl == .nextVideo,
-                        scale: 1.55,
-                        shadowRadius: 14,
+                        .nextVideo,
                         identifier: "player.nextBtn",
                         enabled: vm.hasNext,
                         width: 64,
@@ -425,14 +440,20 @@ struct PlayerControlsOverlay: View {
                 endPoint: .bottom
             )
             .contentShape(Rectangle())
+            #if !os(tvOS)
             .onTapGesture {
                 controlsLog.notice("[menu] gradient background tap — controlsVisible=\(vm.controlsVisible)")
                 vm.toggleControls()
             }
+            #endif
         )
         #if os(tvOS)
-        // Controls overlay is not a focus section — the outer view handles all input.
-        .onTapGesture { vm.toggleControls() }
+        .onChange(of: highlightedControl) { _, newValue in
+            if hudFocusEnabled { focusedHUD = newValue }
+        }
+        .onChange(of: hudFocusEnabled) { _, enabled in
+            if enabled { focusedHUD = highlightedControl }
+        }
         #endif
     }
 }
@@ -444,25 +465,40 @@ extension PlayerControlsOverlay {
     #if os(tvOS)
     /// The outer player routes remote input; labels avoid tvOS 26's forced Liquid Glass button chrome.
     func tvOverlayControl<Content: View>(
-        highlighted: Bool,
-        scale: CGFloat,
-        shadowOpacity: Double = 0.85,
-        shadowRadius: CGFloat,
+        _ control: PlayerView.TVPlayerControl,
         identifier: String,
         enabled: Bool = true,
         width: CGFloat? = nil,
         height: CGFloat? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        content()
-            .frame(width: width, height: height)
-            .scaleEffect(highlighted ? scale : 1)
-            .shadow(color: highlighted ? .white.opacity(shadowOpacity) : .clear, radius: shadowRadius)
-            .animation(.easeInOut(duration: 0.15), value: highlighted)
-            .disabled(!enabled)
-            .accessibilityElement()
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier(identifier)
+        let highlighted = highlightedControl == control
+        let acceptsFocus = highlighted && hudFocusEnabled && enabled
+        return Button {
+            onActivate(control)
+        } label: {
+            content()
+                .frame(width: width, height: height)
+                .padding(8)
+                .background(Circle().fill(highlighted ? TVFocusStyle.fill : Color.black.opacity(0.35)))
+                .overlay(Circle().stroke(highlighted ? TVFocusStyle.color : Color.clear, lineWidth: 2.5))
+                .shadow(color: highlighted ? TVFocusStyle.color.opacity(0.85) : .clear, radius: 12)
+                .scaleEffect(highlighted ? 1.08 : 1)
+                .animation(.easeInOut(duration: 0.15), value: highlighted)
+        }
+        .buttonStyle(TVImmediateSelectButtonStyle())
+        .focusEffectDisabled()
+        .focusable(acceptsFocus)
+        .focused($focusedHUD, equals: control)
+        .disabled(!enabled)
+        .modifier(
+            ConditionalMoveCommand(enabled: acceptsFocus) { direction in
+                onMove(direction)
+            }
+        )
+        .onPlayPauseCommand { vm.togglePlayPause() }
+        .onExitCommand { onExit() }
+        .accessibilityIdentifier(identifier)
     }
     #endif
 
@@ -471,15 +507,7 @@ extension PlayerControlsOverlay {
     @ViewBuilder
     var playPauseButton: some View {
         #if os(tvOS)
-        tvOverlayControl(
-            highlighted: highlightedControl == .playPause,
-            scale: 1.6,
-            shadowOpacity: 0.65,
-            shadowRadius: 8,
-            identifier: "player.playPauseButton",
-            width: 88,
-            height: 88
-        ) {
+        tvOverlayControl(.playPause, identifier: "player.playPauseButton", width: 88, height: 88) {
             playPauseIcon
         }
         #else
@@ -505,13 +533,10 @@ extension PlayerControlsOverlay {
     // MARK: - Seek buttons
 
     @ViewBuilder
-    func seekButton(symbol: String, seconds: TimeInterval, tvHighlighted: Bool = false) -> some View {
+    func seekButton(symbol: String, seconds: TimeInterval) -> some View {
         #if os(tvOS)
         tvOverlayControl(
-            highlighted: tvHighlighted,
-            scale: 1.55,
-            shadowOpacity: 0.6,
-            shadowRadius: 7,
+            seconds < 0 ? .seekBack : .seekForward,
             identifier: seconds < 0 ? "player.seekBackButton" : "player.seekForwardButton",
             width: 72,
             height: 72
@@ -863,9 +888,8 @@ extension PlayerControlsOverlay {
     // MARK: - Quick-access label helpers
 
     private var speedLabel: String {
-        store.settings.playbackSpeed == 1.0
-            ? "Normal"
-            : String(format: "%.2g", store.settings.playbackSpeed) + "×"
+        let channelId = vm.playerInfo?.video.channelId ?? video.channelId
+        return AppSettings.formattedSpeed(store.settings.resolvedPlaybackSpeed(for: channelId))
     }
 
     private var qualityLabel: String {

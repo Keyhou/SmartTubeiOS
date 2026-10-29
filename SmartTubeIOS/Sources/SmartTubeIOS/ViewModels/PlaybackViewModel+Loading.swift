@@ -709,6 +709,7 @@ extension PlaybackViewModel {
             }
             playerInfo = info
             availableFormats = Self.deduplicatedVideoFormats(info.formats)
+            applyChannelPlaybackPreferences()
             playerLog.notice(
                 "[loadAsync] availableFormats after initial dedup: raw=\(info.formats.count) deduped=\(availableFormats.count) maxH=\(availableFormats.map(\.height).max() ?? 0)"
             )
@@ -767,11 +768,17 @@ extension PlaybackViewModel {
                 sponsorCached = true  // disabled/excluded — no fetch needed in Phase 2
             }
 
-            // Restore saved watch position (mirrors VideoStateController)
+            // Restore the further of the local playhead and YouTube's watched percent.
+            // The choice is committed once duration is known (readyToPlay).
             let savedState = await VideoStateStore.shared.state(for: video.id)
-            if let pos = savedState?.position, pos > 5 {
-                savedPositionToRestore = pos
-                playerLog.notice("Restoring position \(Int(pos))s for \(video.id)")
+            pendingLocalResume = savedState?.position
+            pendingYouTubeFraction = video.watchProgress ?? info.video.watchProgress
+            didCommitResumePosition = false
+            if let known = info.video.duration ?? video.duration, known > 0 {
+                commitResumePosition(duration: known)
+                if let pos = savedPositionToRestore {
+                    playerLog.notice("Restoring position \(Int(pos))s for \(video.id)")
+                }
             }
             // Filter the quality picker to only heights that the HLS manifest actually
             // offers. The iOS player response lists all adaptive CDN formats at every
@@ -787,11 +794,14 @@ extension PlaybackViewModel {
                     guard let self, !Task.isCancelled, !variantURLs.isEmpty else { return }
                     self.hlsVariantURLs = variantURLs
                     let beforeCount = self.availableFormats.count
-                    self.availableFormats = self.availableFormats.filter { variantURLs.keys.contains($0.height) }
+                    self.availableFormats = qualityPickerFormats(
+                        formats: self.availableFormats, hlsHeights: Set(variantURLs.keys))
                     playerLog.notice(
                         "HLS variants (bg): \(variantURLs.keys.sorted().reversed()) — filtered quality picker \(beforeCount) → \(self.availableFormats.count) options"
                     )
-                    if let sel = self.selectedFormat, !variantURLs.keys.contains(sel.height) {
+                    if let sel = self.selectedFormat, !variantURLs.keys.contains(sel.height),
+                        !sel.isUHDPlayableOutsideHLS
+                    {
                         self.selectedFormat = nil
                     }
                 }
@@ -947,9 +957,17 @@ extension PlaybackViewModel {
                                     playerLog.notice(
                                         "[duration] deferred KVO update: \(String(format: "%.1f", seconds))s (was \(String(format: "%.1f", prev))s)"
                                     )
+                                    self.commitResumePosition(duration: seconds)
+                                    if let pos = self.savedPositionToRestore, pos > 0 {
+                                        self.savedPositionToRestore = nil
+                                        self.seek(to: pos)
+                                    }
                                     break
                                 }
                             }
+                        }
+                        if self.duration > 0 {
+                            self.commitResumePosition(duration: self.duration)
                         }
                         if let pos = self.savedPositionToRestore, pos > 0 {
                             self.savedPositionToRestore = nil

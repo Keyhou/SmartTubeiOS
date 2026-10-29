@@ -109,6 +109,7 @@ extension PlaybackViewModel {
                 skipMuxed: true
             ) {
                 playerLog.notice("[VisionOS] ✅ native HLS playback — exhaustiveRetry done")
+                await enrichPickerWithUHDFormats(for: video.id)
                 return
             }
             playerLog.notice("[VisionOS] HLS/adaptive playback failed — continuing legacy fallbacks")
@@ -807,7 +808,10 @@ extension PlaybackViewModel {
                 playerLog.notice("[VR→HLS/upgrade] TVEmbedded HLS available — upgrading from AndroidVR quality")
                 // Capture position right before replacement so the stale window is minimal.
                 let pos = currentTime
-                if pos > 0.5 { savedPositionToRestore = pos }
+                if pos > 0.5 {
+                    savedPositionToRestore = pos
+                    didCommitResumePosition = true
+                }
                 if await attemptURL(hlsURL, for: video, info: tvEmbedInfo, label: "VR→HLS/upgrade/TVEmbed") {
                     playerLog.notice("[VR→HLS/upgrade] ✅ quality upgrade via TVEmbedded HLS complete")
                     return
@@ -828,7 +832,10 @@ extension PlaybackViewModel {
             if let hlsURL = mwebInfo.hlsURL {
                 playerLog.notice("[VR→HLS/upgrade] MWEB HLS available — upgrading from AndroidVR quality")
                 let pos = currentTime
-                if pos > 0.5 { savedPositionToRestore = pos }
+                if pos > 0.5 {
+                    savedPositionToRestore = pos
+                    didCommitResumePosition = true
+                }
                 if await attemptURL(hlsURL, for: video, info: mwebInfo, label: "VR→HLS/upgrade/MWEB") {
                     playerLog.notice("[VR→HLS/upgrade] ✅ quality upgrade via MWEB HLS complete")
                     return
@@ -854,7 +861,10 @@ extension PlaybackViewModel {
             let vrInfo = try await api.fetchPlayerInfoAndroidVR(videoId: video.id)
             guard !Task.isCancelled, currentVideo?.id == video.id else { return }
             let vrPos = currentTime
-            if vrPos > 0.5 { savedPositionToRestore = vrPos }
+            if vrPos > 0.5 {
+                savedPositionToRestore = vrPos
+                didCommitResumePosition = true
+            }
             if await tryAllStreams(
                 video: video, info: vrInfo,
                 label: "muxed→upgrade/AndroidVR", skipMuxed: true)
@@ -887,6 +897,7 @@ extension PlaybackViewModel {
         let pos = currentTime
         if pos > 0 {
             savedPositionToRestore = pos
+            didCommitResumePosition = true
         }
         retryAttempts = 0
         await exhaustiveRetry(video: video, originalError: originalError)
@@ -1094,6 +1105,7 @@ extension PlaybackViewModel {
                 } ?? allVariantURLs
             playerLog.notice(
                 "[\(label)] HLS: hlsURL=yes variantCount=\(variantURLs.count) effectiveQuality=\(effectiveQuality)")
+            let uhdOutsideHLS = availableFormats.filter(\.isUHDPlayableOutsideHLS)
             if hlsPolicy.requiresH264 {
                 availableFormats = availableFormats.filter { format in
                     hlsPolicy.allowsFormat(height: format.height, mimeType: format.mimeType)
@@ -1101,8 +1113,10 @@ extension PlaybackViewModel {
             }
             if !variantURLs.isEmpty {
                 hlsVariantURLs = variantURLs
-                let playableFormats = availableFormats.filter { variantURLs.keys.contains($0.height) }
-                availableFormats = playableFormats
+                availableFormats = qualityPickerFormats(
+                    formats: availableFormats + uhdOutsideHLS,
+                    hlsHeights: Set(variantURLs.keys)
+                )
                 // Use a variant playlist URL directly rather than the master manifest URL.
                 // The master manifest (hls_variant) stalls AVPlayer on manifest.googlevideo.com
                 // because it requires session-level auth that AVPlayer's isolated network stack

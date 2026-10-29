@@ -195,7 +195,6 @@ extension ShortsPlayerView {
         vm.loadShort(video: video)
         #else
         vm.load(video: video)
-        vm.setPlaybackSpeed(store.settings.playbackSpeed)
         vm.updateSettings(store.settings)
         #endif
     }

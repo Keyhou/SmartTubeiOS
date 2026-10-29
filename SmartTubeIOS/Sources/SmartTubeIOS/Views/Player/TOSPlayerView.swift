@@ -671,10 +671,11 @@ public struct TOSPlayerView: View {
         Menu {
             ForEach(AppSettings.availableSpeeds, id: \.self) { speed in
                 Button {
-                    store.settings.playbackSpeed = speed
+                    store.settings.setPlaybackSpeed(speed, forChannel: vm.channelId)
+                    vm.updateSettings(store.settings)
                     vm.setPlaybackRate(speed)
                 } label: {
-                    if abs(store.settings.playbackSpeed - speed) < 0.01 {
+                    if abs(vm.settings.playbackSpeed - speed) < 0.01 {
                         Label(speedLabel(for: speed), systemImage: "checkmark")
                     } else {
                         Text(speedLabel(for: speed))
@@ -682,7 +683,7 @@ public struct TOSPlayerView: View {
                 }
             }
         } label: {
-            Text(speedLabel(for: store.settings.playbackSpeed))
+            Text(speedLabel(for: vm.settings.playbackSpeed))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 11)
@@ -696,7 +697,7 @@ public struct TOSPlayerView: View {
     }
 
     private func speedLabel(for speed: Double) -> String {
-        speed == 1.0 ? "Normal (1\u{d7})" : String(format: "%.2g\u{d7}", speed)
+        AppSettings.formattedSpeed(speed)
     }
 
     // MARK: - More menu (Like/Dislike, Sleep Timer, Share, Comments)

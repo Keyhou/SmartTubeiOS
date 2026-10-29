@@ -241,8 +241,17 @@ final class ShortsEmbedPlayerViewModel: NSObject {
     // MARK: - Settings update
 
     /// Called from `ShortsPlayerView.onAppear`. Mirrors `TOSPlayerViewModel.updateSettings(_:)`.
+    private var baseSettings = AppSettings()
+
     func updateSettings(_ newSettings: AppSettings) {
-        settings = newSettings
+        baseSettings = newSettings
+        applyResolvedPlaybackPreferences()
+    }
+
+    func applyResolvedPlaybackPreferences() {
+        settings = baseSettings
+        settings.playbackSpeed = baseSettings.resolvedPlaybackSpeed(for: channelId)
+        settings.preferredCaptionLanguage = baseSettings.resolvedCaptionLanguage(for: channelId)
     }
 
     // MARK: - Loading
@@ -260,6 +269,7 @@ final class ShortsEmbedPlayerViewModel: NSObject {
 
         videoId = video.id
         channelId = video.channelId
+        applyResolvedPlaybackPreferences()
 
         playerState = .unstarted
         currentTime = 0

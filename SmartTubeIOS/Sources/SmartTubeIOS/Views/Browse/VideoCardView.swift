@@ -358,35 +358,37 @@ public struct VideoCardView: View {
         //   without also playing the video.
         // • .focusable() between contextMenu and onTapGesture keeps the view in the
         //   focus engine so D-pad UP/DOWN can reach it.
-        cardContent
-            .focusable()
-            .onTapGesture { onSelect?() }
-            .focused($isFocused)
-            .onAppear { feedLog.info("[feed] id=\(self.video.id) title=\(self.video.title)") }
-            .onChange(of: isFocused) { _, newValue in
-                focusLog.info("[VideoCard] isFocused=\(newValue) id=\(self.video.id)")
-                #if canImport(WebKit)
-                if newValue, !video.isShort {
-                    let videoId = video.id
-                    Task(priority: .background) {
-                        await YouTubeWebViewHLSExtractor.preWarm(videoId: videoId)
-                    }
+        Button {
+            onSelect?()
+        } label: {
+            cardContent
+                .tvFocusRowChrome(isFocused: isFocused)
+        }
+        .buttonStyle(TVImmediateSelectButtonStyle())
+        .focusEffectDisabled()
+        .focused($isFocused)
+        .onAppear { feedLog.info("[feed] id=\(self.video.id) title=\(self.video.title)") }
+        .onChange(of: isFocused) { _, newValue in
+            focusLog.info("[VideoCard] isFocused=\(newValue) id=\(self.video.id)")
+            #if canImport(WebKit)
+            if newValue, !video.isShort {
+                let videoId = video.id
+                Task(priority: .background) {
+                    await YouTubeWebViewHLSExtractor.preWarm(videoId: videoId)
                 }
-                #endif
             }
-            .shadow(color: isFocused ? .white.opacity(0.9) : .clear, radius: 18, x: 0, y: 0)
-            .scaleEffect(isFocused ? 1.08 : 1.0)
-            .zIndex(isFocused ? 1 : 0)
-            .animation(.easeInOut(duration: 0.15), value: isFocused)
-            .alert(item: $watchLaterAlert) { item in
-                Alert(title: Text(item.title), message: Text(item.message), dismissButton: .default(Text("OK")))
-            }
-            .sheet(item: $playlistPickerMode) { mode in
-                PlaylistPickerSheet(
-                    mode: mode, video: video, sourcePlaylistId: effectivePlaylistId, api: api,
-                    onFinished: handlePlaylistPickerResult
-                )
-            }
+            #endif
+        }
+        .zIndex(isFocused ? 1 : 0)
+        .alert(item: $watchLaterAlert) { item in
+            Alert(title: Text(item.title), message: Text(item.message), dismissButton: .default(Text("OK")))
+        }
+        .sheet(item: $playlistPickerMode) { mode in
+            PlaylistPickerSheet(
+                mode: mode, video: video, sourcePlaylistId: effectivePlaylistId, api: api,
+                onFinished: handlePlaylistPickerResult
+            )
+        }
         #else
         cardContent
             .onAppear { feedLog.info("[feed] id=\(self.video.id) title=\(self.video.title)") }

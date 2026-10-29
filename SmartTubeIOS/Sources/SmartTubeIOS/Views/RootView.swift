@@ -43,7 +43,11 @@ public struct RootView: View {
             #endif
         }
         .environment(\.isLandscapeLayout, isLandscapeLayout)
-        .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isLandscapeLayout = $0 }
+        .onGeometryChange(for: Bool.self) {
+            $0.size.width > $0.size.height
+        } action: {
+            isLandscapeLayout = $0
+        }
         .tint(store.settings.accentColor.color)
         .preferredColorScheme(store.settings.themeName.colorScheme)
         #if !os(tvOS) && ENABLE_DOWNLOADS
@@ -100,11 +104,22 @@ public struct RootView: View {
 
 // MARK: - AppSection
 
-enum AppSection: String, CaseIterable, Identifiable {
+enum AppSection: String, Identifiable {
     case home = "Home"
     case search = "Search"
+    case playlists = "Playlists"
+    case history = "History"
     case library = "Library"
     case settings = "Settings"
+
+    /// iOS and macOS keep the four-tab bar. tvOS adds Playlists and History.
+    static var allCases: [AppSection] {
+        #if os(tvOS)
+        [.home, .search, .playlists, .history, .library, .settings]
+        #else
+        [.home, .search, .library, .settings]
+        #endif
+    }
 
     var id: String { rawValue }
 
@@ -112,6 +127,8 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: return AppSymbol.home
         case .search: return AppSymbol.search
+        case .playlists: return AppSymbol.playlists
+        case .history: return AppSymbol.history
         case .library: return AppSymbol.library
         case .settings: return AppSymbol.settings
         }
@@ -122,6 +139,8 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: HomeView(api: api)
         case .search: SearchView()
+        case .playlists: HomeView(api: api, lockedSection: .playlists)
+        case .history: HomeView(api: api, lockedSection: .history)
         case .library: LibraryView()
         case .settings: SettingsView()
         }
@@ -294,7 +313,8 @@ struct MainTabView: View {
                 // work there. The standard player plays with the app's own sign-in, so
                 // this one error still falls back to it on iOS.
                 if tosState.vm?.playerError == .signInRequired {
-                    rootLog.notice("[RootView] TOS sign-in required for videoId=\(video.id) — opening the standard player")
+                    rootLog.notice(
+                        "[RootView] TOS sign-in required for videoId=\(video.id) — opening the standard player")
                     tosState.markFallback(videoId: video.id)
                     playerRouter.open(video: video, api: api)
                     return
@@ -363,6 +383,7 @@ struct MainTVTabView: View {
                         Label(section.rawValue, systemImage: section.icon)
                     }
                     .tag(section)
+                    .accessibilityIdentifier("tab.\(section.rawValue.lowercased())")
             }
         }
         .environment(searchVM)

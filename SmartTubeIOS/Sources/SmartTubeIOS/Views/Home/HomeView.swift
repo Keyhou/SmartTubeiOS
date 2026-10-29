@@ -48,7 +48,10 @@ public struct HomeView: View {
     @State private var nonShortsCountAtTrigger = 0
     #if os(tvOS)
     @FocusState private var focusedSection: BrowseSection?
+    @FocusState private var queueRowFocused: Bool
     #endif
+    /// Playlists and History tabs on tvOS. Nil on the Home tab and on iOS/macOS.
+    private let lockedSection: BrowseSection.SectionType?
     private var visibleSections: [BrowseSection] {
         let types = store.settings.enabledSections
         var all: [BrowseSection] =
@@ -68,9 +71,15 @@ public struct HomeView: View {
         return all
     }
 
-    public init(api: InnerTubeAPI) {
+    public init(api: InnerTubeAPI, lockedSection: BrowseSection.SectionType? = nil) {
+        self.lockedSection = lockedSection
         _homeVM = State(initialValue: HomeViewModel(api: api))
         _sectionVM = State(initialValue: BrowseViewModel(api: api))
+        if let lockedSection,
+            let section = BrowseSection.allSections.first(where: { $0.type == lockedSection })
+        {
+            _selectedSection = State(initialValue: section)
+        }
     }
 
     // MARK: - Body
@@ -134,6 +143,7 @@ public struct HomeView: View {
         }
         #endif
         .onChange(of: visibleSections) { _, newSections in
+            guard lockedSection == nil else { return }
             if !newSections.contains(selectedSection), let first = newSections.first {
                 selectedSection = first
             }
@@ -141,6 +151,12 @@ public struct HomeView: View {
         .task(id: auth.accessToken) {
             await homeVM.updateAuthToken(auth.accessToken)
             await sectionVM.updateAuthToken(auth.accessToken)
+        }
+        .onAppear {
+            guard let lockedSection,
+                let section = BrowseSection.allSections.first(where: { $0.type == lockedSection })
+            else { return }
+            sectionVM.reload(section: section)
         }
         .task(id: selectedSection) {
             // Reset auto-retry flags when switching sections to prevent stale
@@ -169,18 +185,7 @@ public struct HomeView: View {
 
     private var chipBar: some View {
         #if os(tvOS)
-        HStack(spacing: 8) {
-            ForEach(visibleSections) { section in
-                chipButton(section: section)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .focusSection()
-        .defaultFocus($focusedSection, selectedSection)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home.chipBar")
+        EmptyView()
         #else
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
@@ -391,6 +396,7 @@ public struct HomeView: View {
                 }
             }
         }
+        .accessibilityIdentifier("home.feed")
     }
 
     // MARK: - Section feed  (non-Home chips)
@@ -728,6 +734,23 @@ public struct HomeView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
+        #if os(tvOS)
+        .tvFocusRowChrome(isFocused: queueRowFocused)
+        .background {
+            Button {
+                selectedPlaylist = Video(
+                    id: CurrentQueueStore.playlistID,
+                    title: "Current Queue",
+                    channelTitle: ""
+                )
+            } label: {
+                Color.clear.contentShape(Rectangle())
+            }
+            .buttonStyle(TVImmediateSelectButtonStyle())
+            .focusEffectDisabled()
+            .focused($queueRowFocused)
+        }
+        #else
         .onTapGesture {
             selectedPlaylist = Video(
                 id: CurrentQueueStore.playlistID,
@@ -735,6 +758,7 @@ public struct HomeView: View {
                 channelTitle: ""
             )
         }
+        #endif
         .accessibilityIdentifier("home.currentQueueRow")
         Divider().padding(.horizontal)
     }

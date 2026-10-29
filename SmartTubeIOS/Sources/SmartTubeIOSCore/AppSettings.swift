@@ -1,6 +1,42 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Channel playback preference
+
+/// Speed and caption overrides for one channel. Absent fields inherit the global settings.
+public struct ChannelPlaybackPreference: Equatable, Sendable {
+    public var speed: Double?
+    public var captionLanguage: String?
+    /// Explicit Off. Stays false when the key is missing so a global language still applies.
+    public var captionsOff: Bool
+
+    public init(speed: Double? = nil, captionLanguage: String? = nil, captionsOff: Bool = false) {
+        self.speed = speed
+        self.captionLanguage = captionLanguage
+        self.captionsOff = captionsOff
+    }
+}
+
+extension ChannelPlaybackPreference: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case speed, captionLanguage, captionsOff
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        speed = try container.decodeIfPresent(Double.self, forKey: .speed)
+        captionLanguage = try container.decodeIfPresent(String.self, forKey: .captionLanguage)
+        captionsOff = try container.decodeIfPresent(Bool.self, forKey: .captionsOff) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(speed, forKey: .speed)
+        try container.encodeIfPresent(captionLanguage, forKey: .captionLanguage)
+        try container.encode(captionsOff, forKey: .captionsOff)
+    }
+}
+
 // MARK: - AppSettings
 
 /// Persisted app-wide preferences (mirrors Android `PlayerData`, `MainUIData`, `GeneralData`, etc.).
@@ -145,6 +181,9 @@ public struct AppSettings: Codable {
     /// Applied automatically to each new video on load.
     public var preferredCaptionLanguage: String?
 
+    /// Per-channel speed and caption overrides. Missing entries inherit the global defaults.
+    public var channelPlaybackPreferences: [String: ChannelPlaybackPreference]
+
     // MARK: DeArrow
     public var deArrowEnabled: Bool
 
@@ -194,7 +233,56 @@ public struct AppSettings: Codable {
     // MARK: Types
 
     /// Canonical ordered list of selectable playback speeds — single source of truth.
-    public static let availableSpeeds: [Double] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+    public static let availableSpeeds: [Double] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.6, 1.75, 1.85, 2.0]
+
+    /// General number format so 1.25, 1.6, and 1.85 stay readable. 1× is the HUD label for normal speed.
+    public static func formattedSpeed(_ speed: Double, normalAsOneX: Bool = false) -> String {
+        if abs(speed - 1.0) < 0.001 {
+            return normalAsOneX ? "1×" : "Normal"
+        }
+        return String(format: "%g×", speed)
+    }
+
+    public func resolvedPlaybackSpeed(for channelId: String?) -> Double {
+        guard let channelId, !channelId.isEmpty,
+            let speed = channelPlaybackPreferences[channelId]?.speed
+        else { return playbackSpeed }
+        return speed
+    }
+
+    public func resolvedCaptionLanguage(for channelId: String?) -> String? {
+        guard let channelId, !channelId.isEmpty, let pref = channelPlaybackPreferences[channelId] else {
+            return preferredCaptionLanguage
+        }
+        if pref.captionsOff { return nil }
+        return pref.captionLanguage ?? preferredCaptionLanguage
+    }
+
+    public mutating func setPlaybackSpeed(_ speed: Double, forChannel channelId: String?) {
+        guard let channelId, !channelId.isEmpty else {
+            playbackSpeed = speed
+            return
+        }
+        var pref = channelPlaybackPreferences[channelId] ?? ChannelPlaybackPreference()
+        pref.speed = speed
+        channelPlaybackPreferences[channelId] = pref
+    }
+
+    public mutating func setCaptionLanguage(_ language: String?, forChannel channelId: String?) {
+        guard let channelId, !channelId.isEmpty else {
+            preferredCaptionLanguage = language
+            return
+        }
+        var pref = channelPlaybackPreferences[channelId] ?? ChannelPlaybackPreference()
+        if let language {
+            pref.captionLanguage = language
+            pref.captionsOff = false
+        } else {
+            pref.captionLanguage = nil
+            pref.captionsOff = true
+        }
+        channelPlaybackPreferences[channelId] = pref
+    }
 
     /// Canonical ordered list of selectable seek-interval values (seconds) — used by Stepper on iOS and Picker on tvOS.
     public static let availableSeekOptions: [Int] = [5, 10, 15, 20, 30, 45, 60]
@@ -308,6 +396,7 @@ public struct AppSettings: Codable {
         blockedChannels = [:]
         preferredAudioLanguage = nil
         preferredCaptionLanguage = nil
+        channelPlaybackPreferences = [:]
         deArrowEnabled = false
         poTokenServiceURL = nil
         audioOnlyMode = false
@@ -385,6 +474,7 @@ extension AppSettings {
         case blockedChannels
         case preferredAudioLanguage
         case preferredCaptionLanguage
+        case channelPlaybackPreferences
         case deArrowEnabled
         case poTokenServiceURL
         case audioOnlyMode
@@ -398,7 +488,8 @@ extension AppSettings {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         settingsVersion = c.safeDecode(Int.self, forKey: .settingsVersion, default: 0)
         preferredQuality = c.safeDecode(VideoQuality.self, forKey: .preferredQuality, default: d.preferredQuality)
-        playbackSpeed = c.safeDecode(Double.self, forKey: .playbackSpeed, default: d.playbackSpeed)
+        let decodedSpeed = c.safeDecode(Double.self, forKey: .playbackSpeed, default: d.playbackSpeed)
+        playbackSpeed = abs(decodedSpeed - 1.7) < 0.01 ? 1.6 : decodedSpeed
         autoplayEnabled = c.safeDecode(Bool.self, forKey: .autoplayEnabled, default: d.autoplayEnabled)
         subtitlesLanguage = c.safeDecode(String?.self, forKey: .subtitlesLanguage, default: d.subtitlesLanguage)
         backgroundPlaybackEnabled = c.safeDecode(
@@ -431,10 +522,14 @@ extension AppSettings {
         accentColor = c.safeDecode(AccentColorChoice.self, forKey: .accentColor, default: d.accentColor)
         let columns = Self.availableGridColumnCounts
         gridColumnsPortrait = min(
-            max(c.safeDecode(Int.self, forKey: .gridColumnsPortrait, default: d.gridColumnsPortrait), columns.lowerBound),
+            max(
+                c.safeDecode(Int.self, forKey: .gridColumnsPortrait, default: d.gridColumnsPortrait), columns.lowerBound
+            ),
             columns.upperBound)
         gridColumnsLandscape = min(
-            max(c.safeDecode(Int.self, forKey: .gridColumnsLandscape, default: d.gridColumnsLandscape), columns.lowerBound),
+            max(
+                c.safeDecode(Int.self, forKey: .gridColumnsLandscape, default: d.gridColumnsLandscape),
+                columns.lowerBound),
             columns.upperBound)
         enabledSections = c.safeDecode(
             [BrowseSection.SectionType].self, forKey: .enabledSections, default: d.enabledSections)
@@ -452,6 +547,9 @@ extension AppSettings {
             String?.self, forKey: .preferredAudioLanguage, default: d.preferredAudioLanguage)
         preferredCaptionLanguage = c.safeDecode(
             String?.self, forKey: .preferredCaptionLanguage, default: d.preferredCaptionLanguage)
+        channelPlaybackPreferences = c.safeDecode(
+            [String: ChannelPlaybackPreference].self, forKey: .channelPlaybackPreferences,
+            default: d.channelPlaybackPreferences)
         deArrowEnabled = c.safeDecode(Bool.self, forKey: .deArrowEnabled, default: d.deArrowEnabled)
         poTokenServiceURL = c.safeDecode(URL?.self, forKey: .poTokenServiceURL, default: d.poTokenServiceURL)
         audioOnlyMode = c.safeDecode(Bool.self, forKey: .audioOnlyMode, default: d.audioOnlyMode)

@@ -175,6 +175,27 @@ public struct PlayerInfo: Sendable {
         }
     }
 
+    /// Merges extra formats by URL. A URL that is already present is skipped.
+    public func appendingFormats(_ extra: [VideoFormat]) -> PlayerInfo {
+        var seen = Set(formats.compactMap { $0.url?.absoluteString })
+        var merged = formats
+        for format in extra {
+            if let url = format.url?.absoluteString {
+                guard seen.insert(url).inserted else { continue }
+            }
+            merged.append(format)
+        }
+        return PlayerInfo(
+            video: video,
+            formats: merged,
+            hlsURL: hlsURL,
+            dashURL: dashURL,
+            captionTracks: captionTracks,
+            trackingURLs: trackingURLs,
+            endCards: endCards
+        )
+    }
+
     /// Returns a copy of this `PlayerInfo` with `&pot=<token>` appended to every
     /// non-nil format URL, `hlsURL`, and `dashURL`.
     /// Call site in `PlaybackViewModel+Loading` applies this after `fetchPlayerInfo`

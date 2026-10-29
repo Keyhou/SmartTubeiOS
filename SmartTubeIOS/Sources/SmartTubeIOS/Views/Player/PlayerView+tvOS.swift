@@ -55,13 +55,13 @@ extension PlayerView {
     /// `tvNextControl(from:direction:)` rather than SwiftUI's native focus
     /// engine, giving full control over the d-pad routing logic.
     enum TVPlayerControl: Equatable {
-        case back, channel, more  // top row
-        case seekBack, playPause, seekForward  // centre row
-        case prevVideo, prevChapter, nextChapter, nextVideo  // bottom row
+        case back, channel, like, dislike, speed, captions, quality, more
+        case seekBack, playPause, seekForward
+        case prevVideo, prevChapter, nextChapter, nextVideo
 
         var isTopRow: Bool {
             switch self {
-            case .back, .channel, .more: true
+            case .back, .channel, .like, .dislike, .speed, .captions, .quality, .more: true
             default: false
             }
         }
@@ -71,6 +71,10 @@ extension PlayerView {
             default: false
             }
         }
+
+        static let topRow: [TVPlayerControl] = [
+            .back, .channel, .like, .dislike, .speed, .captions, .quality, .more,
+        ]
     }
 
     // MARK: - Overlay state
@@ -93,62 +97,73 @@ extension PlayerView {
 
     // MARK: - Controls navigation
 
+    /// Top-row controls. Like and dislike are omitted until the viewer is signed in.
+    func tvTopRow() -> [TVPlayerControl] {
+        TVPlayerControl.topRow.filter { control in
+            switch control {
+            case .like, .dislike: authService.isSignedIn
+            default: true
+            }
+        }
+    }
+
+    /// Bottom-row controls that exist for this video. Chapter buttons are omitted when there are none.
+    func tvBottomRow() -> [TVPlayerControl] {
+        var row: [TVPlayerControl] = [.prevVideo]
+        if !vm.chapters.isEmpty {
+            row.append(.prevChapter)
+        }
+        if !vm.chapters.isEmpty {
+            row.append(.nextChapter)
+        }
+        row.append(.nextVideo)
+        return row
+    }
+
+    private func step(_ row: [TVPlayerControl], from current: TVPlayerControl, by delta: Int) -> TVPlayerControl {
+        guard let index = row.firstIndex(of: current) else { return current }
+        let next = index + delta
+        guard row.indices.contains(next) else { return current }
+        return row[next]
+    }
+
     /// Returns the next control to highlight when the user presses a d-pad direction.
+    /// The focus engine must not also move focus, or the highlight double-steps.
     func tvNextControl(from current: TVPlayerControl, direction: MoveCommandDirection) -> TVPlayerControl {
         switch direction {
         case .left:
-            switch current {
-            // top row
-            case .more: return .channel
-            case .channel: return .back
-            // center row
-            case .playPause: return .seekBack
-            case .seekForward: return .playPause
-            // bottom row
-            case .prevChapter: return .prevVideo
-            case .nextChapter: return .prevChapter
-            case .nextVideo: return vm.chapters.isEmpty ? .prevVideo : .nextChapter
-            default: return current
-            }
+            if current.isTopRow { return step(tvTopRow(), from: current, by: -1) }
+            if current.isCenterRow { return step([.seekBack, .playPause, .seekForward], from: current, by: -1) }
+            return step(tvBottomRow(), from: current, by: -1)
         case .right:
+            if current.isTopRow { return step(tvTopRow(), from: current, by: 1) }
+            if current.isCenterRow { return step([.seekBack, .playPause, .seekForward], from: current, by: 1) }
+            return step(tvBottomRow(), from: current, by: 1)
+        case .up:
             switch current {
-            // top row
-            case .back: return .channel
-            case .channel: return .more
-            // center row
-            case .seekBack: return .playPause
-            case .playPause: return .seekForward
-            // bottom row
-            case .prevVideo: return vm.chapters.isEmpty ? .nextVideo : .prevChapter
-            case .prevChapter: return .nextChapter
-            case .nextChapter: return .nextVideo
+            case .playPause: return .captions
+            case .seekBack: return .like
+            case .seekForward: return .more
+            case .prevVideo, .prevChapter: return .seekBack
+            case .nextChapter, .nextVideo: return .seekForward
             default: return current
             }
-        case .up:
-            if current.isCenterRow { return .more }  // center → top row
-            if !current.isCenterRow && !current.isTopRow {
-                // bottom row → center row (map by position)
-                switch current {
-                case .prevVideo, .prevChapter: return .seekBack
-                default: return .seekForward
-                }
-            }
-            return current  // already at top
         case .down:
-            if current.isTopRow { return .playPause }  // top row → center row
-            if current.isCenterRow {  // center row → bottom row
-                switch current {
-                case .seekBack: return vm.chapters.isEmpty ? .prevVideo : .prevChapter
-                default: return vm.chapters.isEmpty ? .nextVideo : .nextChapter
-                }
+            switch current {
+            case .captions: return .playPause
+            case .back, .channel, .like, .dislike, .speed: return .seekBack
+            case .quality, .more: return .seekForward
+            case .seekBack: return vm.chapters.isEmpty ? .prevVideo : .prevChapter
+            case .playPause, .seekForward: return vm.chapters.isEmpty ? .nextVideo : .nextChapter
+            default: return current
             }
-            return current  // already at bottom
         @unknown default: return current
         }
     }
 
     /// Executes the action for the currently highlighted control.
     func tvActivateControl(_ control: TVPlayerControl) {
+        if Date().timeIntervalSince(lastTVOverlayDismissTime) < 0.35 { return }
         let playerLog = CrashlyticsLogger(category: "Player")
         playerLog.notice("[tv] tvActivateControl(\(String(describing: control)))")
         switch control {
@@ -158,10 +173,23 @@ extension PlayerView {
         case .channel:
             let channelId = vm.playerInfo?.video.channelId ?? video.channelId
             if let cid = channelId, !cid.isEmpty { channelDestination = ChannelDestination(channelId: cid) }
+        case .like:
+            if authService.isSignedIn { vm.like() }
+        case .dislike:
+            if authService.isSignedIn { vm.dislike() }
+        case .speed:
+            highlightedControl = .speed
+            showSpeedPicker = true
+        case .captions:
+            highlightedControl = .captions
+            showCaptionPicker = true
+        case .quality:
+            highlightedControl = .quality
+            showQualityPicker = true
         case .more:
             playerLog.notice("[tv] .more activated — setting showMoreMenu=true")
+            highlightedControl = .more
             showMoreMenu = true
-            highlightedControl = nil
         case .seekBack: vm.seekRelative(seconds: -Double(store.settings.seekBackSeconds))
         case .playPause: vm.togglePlayPause()
         case .seekForward: vm.seekRelative(seconds: Double(store.settings.seekForwardSeconds))
@@ -169,6 +197,95 @@ extension PlayerView {
         case .prevChapter: if vm.hasPreviousChapter { vm.skipToPreviousChapter() }
         case .nextChapter: if vm.hasNextChapter { vm.skipToNextChapter() }
         case .nextVideo: if vm.hasNext { vm.playNext() }
+        }
+    }
+
+    /// D-pad while the HUD host or a highlighted button owns focus.
+    func handleTVMove(_ direction: MoveCommandDirection) {
+        guard !isTransitioning else { return }
+        if let current = highlightedControl {
+            highlightedControl = tvNextControl(from: current, direction: direction)
+            vm.showControls()
+        } else if vm.controlsVisible {
+            switch direction {
+            case .left: vm.seekRelative(seconds: -Double(store.settings.seekBackSeconds))
+            case .right: vm.seekRelative(seconds: Double(store.settings.seekForwardSeconds))
+            default:
+                highlightedControl = .playPause
+                vm.showControls()
+            }
+        } else {
+            switch direction {
+            case .left: vm.seekRelative(seconds: -10)
+            case .right: vm.seekRelative(seconds: 10)
+            default:
+                vm.showControls()
+                highlightedControl = .playPause
+            }
+        }
+    }
+
+    /// Select when no HUD button is highlighted. Press-down and press-up both arrive; the
+    /// first one within 80 ms wins. A picker that just closed swallows Select for 350 ms.
+    func handleTVSelectPress() {
+        let now = Date()
+        if now.timeIntervalSince(lastTVSelectTime) < 0.08 { return }
+        if now.timeIntervalSince(lastTVOverlayDismissTime) < 0.35 { return }
+        guard !isAnyOverlayVisible && !isSkipToastActive else { return }
+        lastTVSelectTime = now
+        if let current = highlightedControl {
+            tvActivateControl(current)
+        } else {
+            vm.togglePlayPause()
+            highlightedControl = .playPause
+            vm.showControls()
+        }
+    }
+
+    /// Menu/Back. Debounced so a focused button and the player body do not both act.
+    func handleTVExit() {
+        let now = Date()
+        if now.timeIntervalSince(lastTVExitTime) < 0.05 { return }
+        lastTVExitTime = now
+        if showMoreMenu {
+            showMoreMenu = false
+            return
+        }
+        if showQualityPicker {
+            showQualityPicker = false
+            return
+        }
+        if showSpeedPicker {
+            showSpeedPicker = false
+            return
+        }
+        if showSleepTimerPicker {
+            showSleepTimerPicker = false
+            return
+        }
+        if showCaptionPicker {
+            showCaptionPicker = false
+            return
+        }
+        if showAudioTrackPicker {
+            showAudioTrackPicker = false
+            return
+        }
+        if showDescriptionSheet {
+            showDescriptionSheet = false
+            return
+        }
+        if showCommentsSheet {
+            showCommentsSheet = false
+            return
+        }
+        if highlightedControl != nil {
+            highlightedControl = nil
+        } else if vm.controlsVisible {
+            vm.toggleControls()
+        } else {
+            vm.stop()
+            dismiss()
         }
     }
 

@@ -13,6 +13,11 @@ private let playerLog = CrashlyticsLogger(category: "Player")
 extension PlaybackViewModel {
 
     public func togglePlayPause() {
+        let now = Date()
+        if now.timeIntervalSince(lastTogglePlayPauseTime) < Self.togglePlayPauseWindow {
+            return
+        }
+        lastTogglePlayPauseTime = now
         if videoEnded {
             videoEnded = false
             seek(to: 0)

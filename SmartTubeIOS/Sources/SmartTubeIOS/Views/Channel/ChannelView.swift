@@ -163,20 +163,32 @@ public struct ChannelView: View {
             if compact {
                 LazyVStack(spacing: 0) {
                     ForEach(videos) { video in
-                        VideoCardView(video: video, compact: true)
-                            .padding(.horizontal)
-                            .padding(.vertical, 6)
-                            .accessibilityIdentifier("video.card.\(video.id)")
-                            .onTapGesture {
+                        VideoCardView(
+                            video: video,
+                            compact: true,
+                            onSelect: {
                                 #if os(iOS)
                                 playerRouter.open(video: video, api: api)
                                 #else
                                 selectedVideo = video
                                 #endif
                             }
-                            .onAppear {
-                                if video.id == vm.videos.last?.id { vm.loadMore() }
-                            }
+                        )
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                        .accessibilityIdentifier("video.card.\(video.id)")
+                        #if !os(tvOS)
+                        .onTapGesture {
+                            #if os(iOS)
+                            playerRouter.open(video: video, api: api)
+                            #else
+                            selectedVideo = video
+                            #endif
+                        }
+                        #endif
+                        .onAppear {
+                            if video.id == vm.videos.last?.id { vm.loadMore() }
+                        }
                         Divider().padding(.horizontal)
                     }
                 }
@@ -236,9 +248,11 @@ public struct ChannelView: View {
         let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
         return LazyVGrid(columns: columns, spacing: 8) {
             ForEach(videos) { video in
-                VideoCardView(video: video)
+                VideoCardView(video: video, onSelect: { selectShort(video, from: videos) })
                     .aspectRatio(9 / 16, contentMode: .fit)
-                    .onTapGesture { selectShort(video, from: videos) }
+                    #if !os(tvOS)
+                .onTapGesture { selectShort(video, from: videos) }
+                    #endif
                     .onAppear {
                         if video.id == vm.videos.last?.id { vm.loadMore() }
                     }

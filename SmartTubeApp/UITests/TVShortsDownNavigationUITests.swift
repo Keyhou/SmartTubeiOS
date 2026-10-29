@@ -5,8 +5,8 @@ import XCTest
 //
 // Regression test: pressing DOWN from the Shorts row must reach the video grid.
 //
-// Navigation path (Home chip, Shorts visible):
-//   tab-bar  →(↓1)→  chip-bar  →(↓2)→  shorts-row  →(↓3)→  video-grid
+// Navigation path (Home tab, Shorts visible):
+//   tab-bar  →(↓1)→  shorts-row  →(↓2)→  video-grid
 //
 // Run:
 //   xcodebuild test -workspace SmartTube.xcworkspace -scheme "Smart Tube" \
@@ -54,14 +54,13 @@ final class TVShortsDownNavigationUITests: XCTestCase {
 
     // MARK: - Test
 
-    /// Presses DOWN exactly 3 times from the tab bar and verifies focus reaches
-    /// the video grid. Screenshots and an accessibility-tree dump are attached
-    /// after every press so failures are immediately diagnosable.
-    func test_ThreeDownPresses_LandOnVideoGrid() throws {
+    /// Presses DOWN twice from the tab bar and verifies focus reaches the video grid.
+    /// The Home chip bar is gone, so the first press lands on Shorts and the second on the grid.
+    func test_TwoDownPresses_LandOnVideoGrid() throws {
         // Wait for home feed to be ready.
-        let chipBar = app.descendants(matching: .any)["home.chipBar"]
+        let chipBar = app.descendants(matching: .any)["home.feed"]
         guard chipBar.waitForExistence(timeout: 20) else {
-            try captureAndSkip("home.chipBar did not appear — Home tab not loaded", in: app)
+            try captureAndSkip("home.feed did not appear — Home tab not loaded", in: app)
         }
 
         // On tvOS the outer HStack's .accessibilityIdentifier("home.shortsRow")
@@ -86,45 +85,35 @@ final class TVShortsDownNavigationUITests: XCTestCase {
                 in: app)
         }
 
-        // ── DOWN 1 ── tab-bar → chip-bar (or content if no chip-bar focus)
+        // ── DOWN 1 ── tab bar → Shorts row
         remote.press(.down)
         Thread.sleep(forTimeInterval: 0.8)
         snap("1-after-first-down")
         let focused1 = focusedIdentifier() ?? "<nothing>"
         XCTContext.runActivity(named: "After DOWN 1 — focused: \(focused1)") { _ in }
 
-        // ── DOWN 2 ── chip-bar → Shorts row
+        // ── DOWN 2 ── Shorts row → video grid
         remote.press(.down)
         Thread.sleep(forTimeInterval: 0.8)
         snap("2-after-second-down")
         let focused2 = focusedIdentifier() ?? "<nothing>"
         XCTContext.runActivity(named: "After DOWN 2 — focused: \(focused2)") { _ in }
 
-        // ── DOWN 3 ── Shorts row → video grid  (the regression trigger)
-        remote.press(.down)
-        Thread.sleep(forTimeInterval: 0.8)
-        snap("3-after-third-down")
-        let focused3 = focusedIdentifier() ?? "<nothing>"
-        XCTContext.runActivity(named: "After DOWN 3 — focused: \(focused3)") { _ in }
+        treeSnapshot("accessibility-tree-after-2-downs")
 
-        treeSnapshot("accessibility-tree-after-3-downs")
-
-        // ── Assertions ──
-        // After 3 DOWNs: no home.shortsRow button should be focused,
-        // and a video.card.* element should be focused.
         let shortsStillFocused: Bool = {
             let pred = NSPredicate(format: "identifier == 'home.shortsRow' AND hasFocus == true")
             return app.descendants(matching: .any).matching(pred).count > 0
         }()
         XCTAssertFalse(
             shortsStillFocused,
-            "A Shorts button (home.shortsRow) still has focus after 3 DOWNs — DOWN does NOT escape the Shorts row. "
-                + "focused1=\(focused1) focused2=\(focused2) focused3=\(focused3)"
+            "A Shorts button (home.shortsRow) still has focus after 2 DOWNs. "
+                + "focused1=\(focused1) focused2=\(focused2)"
         )
         XCTAssertTrue(
             anyFocused(prefix: "video.card."),
-            "No video.card.* gained focus after 3 DOWNs. "
-                + "focused1=\(focused1) focused2=\(focused2) focused3=\(focused3)"
+            "No video.card.* gained focus after 2 DOWNs. "
+                + "focused1=\(focused1) focused2=\(focused2)"
         )
     }
 }

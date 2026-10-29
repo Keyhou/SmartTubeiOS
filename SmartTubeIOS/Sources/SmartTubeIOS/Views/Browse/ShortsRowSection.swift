@@ -23,6 +23,7 @@ struct ShortsRowSection: View {
 
     #if os(tvOS)
     private let cardWidth: CGFloat = 200
+    @FocusState private var focusedVideoId: String?
     #else
     /// Card width on iOS/iPadOS: ~120 pt gives roughly 3 cards on an iPhone screen.
     private let cardWidth: CGFloat = 120
@@ -57,8 +58,11 @@ struct ShortsRowSection: View {
                 } label: {
                     ShortsCardView(video: video, onTap: { onSelect(video) })
                         .frame(width: cardWidth, height: cardWidth * 16 / 9)
+                        .tvFocusRowChrome(isFocused: focusedVideoId == video.id)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TVImmediateSelectButtonStyle())
+                .focusEffectDisabled()
+                .focused($focusedVideoId, equals: video.id)
                 .accessibilityIdentifier("shorts.card.\(video.id)")
             }
         }
@@ -126,8 +130,11 @@ struct ShortsRowSection: View {
                     ShortsCardView(video: video, onTap: { onSelect(video) })
                         .frame(maxWidth: .infinity)
                         .aspectRatio(9 / 16, contentMode: .fit)
+                        .tvFocusRowChrome(isFocused: focusedVideoId == video.id)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TVImmediateSelectButtonStyle())
+                .focusEffectDisabled()
+                .focused($focusedVideoId, equals: video.id)
                 .accessibilityIdentifier("shorts.card.\(video.id)")
             }
         }

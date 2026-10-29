@@ -349,104 +349,24 @@ extension PlayerView {
             // focus engine to pick a child element or leaving focus on the previous screen.
             .focusScope(playerBodyNamespace)
             .prefersDefaultFocus(in: playerBodyNamespace)
-            .focusable(!isAnyOverlayVisible && !isSkipToastActive)
-            .focused($playerFocused)
-            .modifier(
-                ConditionalMoveCommand(enabled: !isAnyOverlayVisible && !isSkipToastActive) { direction in
-                    swipeLog.debug(
-                        "[tv] onMoveCommand dir=\(String(describing: direction)) isTransitioning=\(isTransitioning) highlighted=\(String(describing: highlightedControl))"
-                    )
-                    guard !isTransitioning else { return }
-                    if let current = highlightedControl {
-                        // Controls-nav mode: move the highlight between buttons.
-                        highlightedControl = tvNextControl(from: current, direction: direction)
-                        vm.showControls()
-                    } else if vm.controlsVisible {
-                        // Controls visible but nav not started yet.
-                        // Left/right seeks directly (Siri Remote gen 1 edge-tap and D-pad seek UX);
-                        // up/down enters control-navigation mode so the user can reach other buttons.
-                        switch direction {
-                        case .left: vm.seekRelative(seconds: -Double(store.settings.seekBackSeconds))
-                        case .right: vm.seekRelative(seconds: Double(store.settings.seekForwardSeconds))
-                        default:
-                            highlightedControl = .playPause
-                            vm.showControls()
+            .background {
+                if highlightedControl == nil && !isAnyOverlayVisible && !isSkipToastActive {
+                    TVRemoteFocusHost { handleTVSelectPress() }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .focusable()
+                        .focused($playerFocused)
+                        .onMoveCommand { direction in
+                            swipeLog.debug(
+                                "[tv] host move dir=\(String(describing: direction)) highlighted=\(String(describing: highlightedControl))"
+                            )
+                            handleTVMove(direction)
                         }
-                    } else {
-                        // Controls hidden: left/right seek, up/down shows controls.
-                        switch direction {
-                        case .left: vm.seekRelative(seconds: -10)
-                        case .right: vm.seekRelative(seconds: 10)
-                        default:
-                            vm.showControls()
-                            highlightedControl = .playPause
-                        }
-                    }
-                }
-            )
-            .onTapGesture {
-                swipeLog.notice(
-                    "[tv] onTapGesture (select) — isAnyOverlayVisible=\(isAnyOverlayVisible) highlighted=\(String(describing: highlightedControl)) controlsVisible=\(vm.controlsVisible)"
-                )
-                guard !isAnyOverlayVisible && !isSkipToastActive else { return }
-                if let current = highlightedControl {
-                    tvActivateControl(current)
-                } else if vm.controlsVisible {
-                    highlightedControl = .playPause
-                    vm.showControls()
-                } else {
-                    vm.showControls()
-                    highlightedControl = .playPause
+                        .onPlayPauseCommand { vm.togglePlayPause() }
+                        .onExitCommand { handleTVExit() }
                 }
             }
             .onPlayPauseCommand { vm.togglePlayPause() }
-            .onExitCommand {
-                swipeLog.notice(
-                    "[tv] onExitCommand — showMoreMenu=\(showMoreMenu) showQuality=\(showQualityPicker) showSpeed=\(showSpeedPicker) showSleep=\(showSleepTimerPicker) showCaption=\(showCaptionPicker) showAudio=\(showAudioTrackPicker) showDesc=\(showDescriptionSheet) showComments=\(showCommentsSheet) highlighted=\(String(describing: highlightedControl)) controlsVisible=\(vm.controlsVisible)"
-                )
-                // Dismiss any open overlay first — Menu/Back is the tvOS dismiss convention.
-                if showMoreMenu {
-                    showMoreMenu = false
-                    return
-                }
-                if showQualityPicker {
-                    showQualityPicker = false
-                    return
-                }
-                if showSpeedPicker {
-                    showSpeedPicker = false
-                    return
-                }
-                if showSleepTimerPicker {
-                    showSleepTimerPicker = false
-                    return
-                }
-                if showCaptionPicker {
-                    showCaptionPicker = false
-                    return
-                }
-                if showAudioTrackPicker {
-                    showAudioTrackPicker = false
-                    return
-                }
-                if showDescriptionSheet {
-                    showDescriptionSheet = false
-                    return
-                }
-                if showCommentsSheet {
-                    showCommentsSheet = false
-                    return
-                }
-                if highlightedControl != nil {
-                    // Esc/Menu from nav mode → exit nav mode, controls stay until timer.
-                    highlightedControl = nil
-                } else if vm.controlsVisible {
-                    vm.toggleControls()
-                } else {
-                    vm.stop()
-                    dismiss()
-                }
-            }
+            .onExitCommand { handleTVExit() }
             .onChange(of: playerFocused) { _, focused in
                 swipeLog.notice("[tv] playerFocused changed → \(focused) isAnyOverlayVisible=\(isAnyOverlayVisible)")
             }
@@ -568,13 +488,14 @@ extension PlayerView {
                     "[tv] isAnyOverlayVisible changed → \(overlayVisible) — moreMenu=\(showMoreMenu) quality=\(showQualityPicker) speed=\(showSpeedPicker) sleep=\(showSleepTimerPicker)"
                 )
                 if overlayVisible {
-                    // Pause the controls auto-hide timer so transport controls stay
-                    // visible behind the overlay while it is open.
+                    vm.showControls()
                     vm.cancelControlsHide()
                 } else {
-                    // Overlay dismissed — reclaim focus and clear nav state.
-                    highlightedControl = nil
-                    playerFocused = true
+                    lastTVOverlayDismissTime = .now
+                    if highlightedControl == nil {
+                        playerFocused = true
+                    }
+                    vm.resumeControlsAutoHide()
                 }
             }
     }
@@ -653,7 +574,6 @@ extension PlayerView {
             #if os(iOS)
             // On iOS, PlayerStateStore.play(video:) already called vm.load() before
             // presenting. Only sync current user preferences; the video is already loading.
-            vm.setPlaybackSpeed(store.settings.playbackSpeed)
             vm.updateSettings(store.settings)
             vm.updateAuthToken(authService.accessToken)
             vm.updateSAPISID(authService.sapisid)
@@ -687,7 +607,6 @@ extension PlayerView {
             } else {
                 vm.load(video: video)
             }
-            vm.setPlaybackSpeed(store.settings.playbackSpeed)
             vm.updateSettings(store.settings)
             vm.updateAuthToken(authService.accessToken)
             // UI testing only: force-show controls so the test can find player.nextBtn.
@@ -922,7 +841,11 @@ extension PlayerView {
             showMoreMenu: $showMoreMenu,
             channelDestination: $channelDestination,
             vm: vm,
-            highlightedControl: $highlightedControl
+            highlightedControl: $highlightedControl,
+            hudFocusEnabled: !isAnyOverlayVisible && !isSkipToastActive,
+            onActivate: { tvActivateControl($0) },
+            onMove: { handleTVMove($0) },
+            onExit: { handleTVExit() }
         )
         #else
         PlayerControlsOverlay(

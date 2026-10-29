@@ -3,8 +3,7 @@ import XCTest
 // MARK: - TVFocusChainUITests
 //
 // Verifies the tvOS focus chain in the Home tab:
-//   Tab bar → ↓ → Chips → ↓ → Video list → (select) → Video plays
-//   Video list → Esc (Menu) → Chips (no video plays)
+//   Tab bar → ↓ → Shorts row → ↓ → Video list → (select) → Video plays
 //
 // Run against the "Smart Tube" tvOS target.
 // XCUIRemote simulates Siri Remote D-pad, select, and menu (back) presses.
@@ -30,7 +29,7 @@ final class TVFocusChainUITests: XCTestCase {
 
     private var chipBar: XCUIElement {
         app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'home.chipBar'"))
+            .matching(NSPredicate(format: "identifier == 'home.feed'"))
             .firstMatch
     }
 
@@ -51,47 +50,29 @@ final class TVFocusChainUITests: XCTestCase {
 
     // MARK: - Tests
 
-    /// Pressing ↓ once from the tab bar enters the chip bar.
-    /// Proven by: ↓ → → → select switches to the next chip's feed
-    /// (only possible if → navigated between chips, meaning focus was in the chip bar).
-    func testDownOneEntersChips() throws {
+    /// Pressing ↓ once from the tab bar enters the Shorts row on the Home feed.
+    func testDownOneEntersShortsRow() throws {
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 15),
-            "home.chipBar must appear — app failed to launch or content did not load"
+            "home.feed must appear — app failed to launch or content did not load"
         )
+        let shorts = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'home.shortsRow'"))
+        guard
+            XCTWaiter().wait(
+                for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "count > 0"), object: shorts)],
+                timeout: 20
+            ) == .completed
+        else {
+            try captureAndSkip("home.shortsRow did not appear — Shorts are hidden or the feed is empty", in: app)
+        }
 
-        // Verify chip buttons are accessible before testing focus navigation.
-        let subscriptionsChip = app.buttons.matching(
-            NSPredicate(format: "identifier == 'chip.Subscriptions'")
-        ).firstMatch
-        XCTAssertTrue(
-            subscriptionsChip.waitForExistence(timeout: 5),
-            "chip.Subscriptions must be in the accessibility tree"
-        )
-
-        // Step 1: ↓ from tab bar → chip bar must receive focus
         remote.press(.down)
         Thread.sleep(forTimeInterval: 1.0)
 
-        // Step 2: → moves to the next chip (Subscriptions)
-        // If focus was NOT in the chip bar, → would move within video content instead.
-        remote.press(.right)
-        Thread.sleep(forTimeInterval: 0.8)
-
-        // Step 3: select activates the focused chip
-        remote.press(.select)
-        Thread.sleep(forTimeInterval: 1.0)
-
-        // A different chip is now selected — the section container loads immediately
-        // regardless of network state (loading spinner, empty state, or content).
-        let sectionContainer = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'home.sectionContainer'"))
-            .firstMatch
-        XCTAssertTrue(
-            sectionContainer.waitForExistence(timeout: 10),
-            "home.sectionContainer must appear after ↓ + → + select — "
-                + "focus was not in the chip bar after one ↓ press"
-        )
+        let focusedShort = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'home.shortsRow' AND hasFocus == true"))
+        XCTAssertGreaterThan(focusedShort.count, 0, "One Down from the Home tab must focus the Shorts row")
     }
 
     /// Pressing ↓ twice from the initial state enters the video list.
@@ -100,7 +81,7 @@ final class TVFocusChainUITests: XCTestCase {
         // Wait for chip bar to appear (app loaded and feed ready)
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 15),
-            "home.chipBar must appear — app failed to launch or content did not load"
+            "home.feed must appear — app failed to launch or content did not load"
         )
 
         // Wait for video cards to load before navigating
@@ -108,11 +89,11 @@ final class TVFocusChainUITests: XCTestCase {
             try captureAndSkip("No video cards loaded within 20 s — network unavailable or feed empty", in: app)
         }
 
-        // Step 1: ↓ from tab bar → chip bar receives focus
+        // Step 1: ↓ from tab bar → Shorts row
         remote.press(.down)
         Thread.sleep(forTimeInterval: 0.6)
 
-        // Step 2: ↓ from chip bar → video list receives focus
+        // Step 2: ↓ from Shorts → video list
         remote.press(.down)
         Thread.sleep(forTimeInterval: 0.6)
 
@@ -131,7 +112,7 @@ final class TVFocusChainUITests: XCTestCase {
     func testEscFromVideoListReturnsFocusToChipsWithoutPlaying() throws {
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 15),
-            "home.chipBar must appear"
+            "home.feed must appear"
         )
 
         guard waitForVideoCards(timeout: 20) else {
@@ -151,7 +132,7 @@ final class TVFocusChainUITests: XCTestCase {
         // Chip bar must still be visible (still on Home screen)
         XCTAssertTrue(
             chipBar.exists,
-            "home.chipBar must still exist after pressing Menu/Esc from the video list"
+            "home.feed must still exist after pressing Menu/Esc from the video list"
         )
 
         // Player must NOT have opened
@@ -202,7 +183,7 @@ final class TVFocusChainUITests: XCTestCase {
     func testPlayerMenuButtonDismissesPlayer() throws {
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 15),
-            "home.chipBar must appear"
+            "home.feed must appear"
         )
 
         guard waitForVideoCards(timeout: 20) else {
@@ -235,7 +216,7 @@ final class TVFocusChainUITests: XCTestCase {
         // Home is restored
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 5),
-            "home.chipBar must reappear after dismissing the player with Menu"
+            "home.feed must reappear after dismissing the player with Menu"
         )
     }
 
@@ -244,7 +225,7 @@ final class TVFocusChainUITests: XCTestCase {
     func testPlayPauseCommandShowsControlsOverlay() throws {
         XCTAssertTrue(
             chipBar.waitForExistence(timeout: 15),
-            "home.chipBar must appear"
+            "home.feed must appear"
         )
 
         guard waitForVideoCards(timeout: 20) else {
@@ -348,7 +329,7 @@ final class TVFocusChainUITests: XCTestCase {
     /// visible (hittable) — not stuck transparent due to nav bar animation conflict.
     func testSettingsTabBarVisibleAfterScrollDownAndUp() throws {
         // Navigate to Settings tab (rightmost)
-        for _ in 0..<4 { remote.press(.right) }
+        for _ in 0..<5 { remote.press(.right) }
         remote.press(.select)
         Thread.sleep(forTimeInterval: 2)
 

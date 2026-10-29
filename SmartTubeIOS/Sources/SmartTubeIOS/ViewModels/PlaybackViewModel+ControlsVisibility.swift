@@ -14,6 +14,13 @@ extension PlaybackViewModel {
         scheduleControlsHide()
     }
 
+    /// Starts the existing hide timer again after a picker or the more menu closes.
+    /// No-ops while `--uitesting-show-controls` forces the controls to stay up.
+    public func resumeControlsAutoHide() {
+        guard controlsVisible else { return }
+        scheduleControlsHide()
+    }
+
     /// Cancels the auto-hide timer without hiding controls.
     /// Call this when an overlay (more menu, picker) opens so the transport
     /// controls remain visible behind the overlay for as long as it is open.

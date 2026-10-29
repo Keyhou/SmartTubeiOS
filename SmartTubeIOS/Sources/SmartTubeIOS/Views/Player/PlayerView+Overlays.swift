@@ -353,12 +353,8 @@ extension PlayerView {
             HStack {
                 Label("Playback Speed", systemImage: "speedometer")
                 Spacer()
-                Text(
-                    store.settings.playbackSpeed == 1.0
-                        ? "Normal"
-                        : "\(store.settings.playbackSpeed, specifier: "%.2g")×"
-                )
-                .foregroundStyle(.secondary)
+                Text(AppSettings.formattedSpeed(activePlaybackSpeed))
+                    .foregroundStyle(.secondary)
             }
             .padding()
             .contentShape(Rectangle())

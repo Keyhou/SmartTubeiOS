@@ -343,6 +343,17 @@ public final class PlaybackViewModel {
     public static let sleepTimerOptions: [Int] = [15, 30, 45, 60]
     /// Position to seek to once the AVPlayerItem is ready.
     var savedPositionToRestore: TimeInterval? = nil
+    /// Local playhead and YouTube fraction, resolved into `savedPositionToRestore` once duration is known.
+    var pendingLocalResume: TimeInterval?
+    var pendingYouTubeFraction: Double?
+    var didCommitResumePosition = false
+    /// Ignores a second Play/Pause delivery inside this window. Hardware buttons on tvOS
+    /// reach `togglePlayPause()` twice for one physical press.
+    var lastTogglePlayPauseTime: Date = .distantPast
+    static let togglePlayPauseWindow: TimeInterval = 0.120
+    /// Unmodified settings from the store. Channel overrides are copied onto `settings` for playback
+    /// and must not be written back over this snapshot.
+    var globalSettings: AppSettings = AppSettings()
     /// Manages watch-history state: position saving, playback-started ping,
     /// and watchtime segment reporting. See WatchtimeTracker.
     var tracker: WatchtimeTracker
@@ -443,6 +454,7 @@ public final class PlaybackViewModel {
         self.sponsorBlock = sponsorBlock
         self.deArrow = deArrow
         self.settings = settings
+        self.globalSettings = settings
 
         // Create managers before any other setup (they hold no back-references yet).
         let sbm = SponsorBlockSkipManager()
@@ -521,8 +533,35 @@ public final class PlaybackViewModel {
     public var currentVideoId: String? { currentVideo?.id }
 
     public func updateSettings(_ newSettings: AppSettings) {
-        settings = newSettings
-        isAudioOnlyMode = newSettings.audioOnlyMode
+        globalSettings = newSettings
+        applyChannelPlaybackPreferences()
+        isAudioOnlyMode = settings.audioOnlyMode
+    }
+
+    /// Copies the channel's resolved speed and caption language onto the playback snapshot.
+    func applyChannelPlaybackPreferences() {
+        let channelId = playerInfo?.video.channelId ?? currentVideo?.channelId
+        let speed = globalSettings.resolvedPlaybackSpeed(for: channelId)
+        let captions = globalSettings.resolvedCaptionLanguage(for: channelId)
+        settings = globalSettings
+        settings.playbackSpeed = speed
+        settings.preferredCaptionLanguage = captions
+        setPlaybackSpeed(speed)
+    }
+
+    /// Resolves the further of the local playhead and YouTube's watched percent once duration is known.
+    func commitResumePosition(duration: TimeInterval) {
+        guard !didCommitResumePosition else { return }
+        didCommitResumePosition = true
+        if let pos = playbackResumePosition(
+            localSeconds: pendingLocalResume,
+            youtubeFraction: pendingYouTubeFraction,
+            duration: duration
+        ) {
+            savedPositionToRestore = pos
+        }
+        pendingLocalResume = nil
+        pendingYouTubeFraction = nil
     }
 }
 

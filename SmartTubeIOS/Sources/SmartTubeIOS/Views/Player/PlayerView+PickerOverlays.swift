@@ -24,6 +24,26 @@ private let pickerLog = CrashlyticsLogger(category: "PlayerMenu")
 
 extension PlayerView {
 
+    var activeChannelId: String? {
+        vm.playerInfo?.video.channelId ?? video.channelId
+    }
+
+    var activePlaybackSpeed: Double {
+        store.settings.resolvedPlaybackSpeed(for: activeChannelId)
+    }
+
+    func persistPlaybackSpeed(_ speed: Double) {
+        store.settings.setPlaybackSpeed(speed, forChannel: activeChannelId)
+        vm.updateSettings(store.settings)
+        vm.setPlaybackSpeed(speed)
+    }
+
+    func persistCaptionSelection(_ track: CaptionTrack?) {
+        store.settings.setCaptionLanguage(track?.languageCode, forChannel: activeChannelId)
+        vm.updateSettings(store.settings)
+        vm.selectCaption(track)
+    }
+
     // MARK: - Quality picker overlay
 
     var qualityPickerOverlay: some View {
@@ -161,15 +181,14 @@ extension PlayerView {
                     VStack(spacing: 0) {
                         ForEach(AppSettings.availableSpeeds, id: \.self) { (speed: Double) in
                             Button {
-                                store.settings.playbackSpeed = speed
-                                vm.setPlaybackSpeed(speed)
+                                persistPlaybackSpeed(speed)
                                 showSpeedPicker = false
                             } label: {
                                 HStack {
-                                    Text(speed == 1.0 ? "Normal (1\u{d7})" : "\(speed, specifier: "%.2g")\u{d7}")
+                                    Text(AppSettings.formattedSpeed(speed))
                                         .foregroundStyle(.primary)
                                     Spacer()
-                                    if abs(store.settings.playbackSpeed - speed) < 0.01 {
+                                    if abs(activePlaybackSpeed - speed) < 0.01 {
                                         Image(systemName: AppSymbol.checkmark)
                                             .foregroundStyle(Color.accentColor)
                                     }
@@ -317,7 +336,7 @@ extension PlayerView {
                     VStack(spacing: 0) {
                         // Off row
                         Button {
-                            vm.selectCaption(nil)
+                            persistCaptionSelection(nil)
                             showCaptionPicker = false
                         } label: {
                             HStack {
@@ -341,7 +360,7 @@ extension PlayerView {
                         Divider()
                         ForEach(vm.availableCaptions) { track in
                             Button {
-                                vm.selectCaption(track)
+                                persistCaptionSelection(track)
                                 showCaptionPicker = false
                             } label: {
                                 HStack {

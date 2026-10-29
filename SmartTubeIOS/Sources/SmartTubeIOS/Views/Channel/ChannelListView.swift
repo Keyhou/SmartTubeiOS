@@ -23,13 +23,10 @@ struct ChannelListView: View {
                         onSelect(channel)
                     } label: {
                         ChannelListRow(channel: channel)
-                            .background(
-                                focusedChannelId == channel.id
-                                    ? Color.primary.opacity(0.12)
-                                    : Color.clear
-                            )
+                            .tvFocusRowChrome(isFocused: focusedChannelId == channel.id)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(TVImmediateSelectButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focusedChannelId, equals: channel.id)
                     #else
                     ChannelListRow(channel: channel)

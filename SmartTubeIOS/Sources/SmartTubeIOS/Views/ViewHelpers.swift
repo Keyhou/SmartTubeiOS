@@ -1,6 +1,10 @@
 import SmartTubeIOSCore
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 // MARK: - ShortsPresentation
 //
 // Shared Identifiable wrapper used by BrowseView and ChannelView to present
@@ -122,11 +126,82 @@ struct DownloadAlertItem: Identifiable {
 // Single source of truth for SF Symbol names used across the app.
 // Use these constants instead of raw strings in Image(systemName:) and Label(..., systemImage:).
 
+#if os(tvOS)
+enum TVFocusStyle {
+    static let color = Color(red: 0.55, green: 0.82, blue: 1.0)
+    static var fill: Color { color.opacity(0.32) }
+}
+
+/// Pressed opacity only. No Liquid Glass platter and no system focus effect.
+struct TVImmediateSelectButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.65 : 1)
+    }
+}
+
+extension View {
+    func tvFocusRowChrome(isFocused: Bool) -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isFocused ? TVFocusStyle.fill : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isFocused ? TVFocusStyle.color : Color.clear, lineWidth: 3)
+            )
+            .shadow(color: isFocused ? TVFocusStyle.color.opacity(0.75) : .clear, radius: 14)
+            .scaleEffect(isFocused ? 1.04 : 1)
+            .animation(.easeInOut(duration: 0.15), value: isFocused)
+    }
+}
+
+/// Focusable host under the HUD. Select is delivered on press-down (Siri Remote 2)
+/// and press-up (Siri Remote 1). The player view debounces the pair.
+struct TVRemoteFocusHost: UIViewRepresentable {
+    var onSelect: () -> Void
+
+    func makeUIView(context: Context) -> SelectHostView {
+        let view = SelectHostView()
+        view.onSelect = onSelect
+        return view
+    }
+
+    func updateUIView(_ uiView: SelectHostView, context: Context) {
+        uiView.onSelect = onSelect
+    }
+
+    final class SelectHostView: UIView {
+        var onSelect: () -> Void = {}
+        override var canBecomeFocused: Bool { true }
+
+        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if presses.contains(where: { $0.type == .select }) {
+                onSelect()
+            } else {
+                super.pressesBegan(presses, with: event)
+            }
+        }
+
+        override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if presses.contains(where: { $0.type == .select }) {
+                onSelect()
+            } else {
+                super.pressesEnded(presses, with: event)
+            }
+        }
+    }
+}
+#endif
+
 enum AppSymbol {
     // MARK: - Navigation tabs
     static let home = "house.fill"
     static let search = "magnifyingglass"
     static let library = "square.stack.fill"
+    static let playlists = "list.and.film"
+    static let history = "clock.arrow.circlepath"
     static let settings = "gearshape.fill"
 
     // MARK: - Navigation / chevrons

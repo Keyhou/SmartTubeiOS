@@ -40,17 +40,15 @@ final class TVLibraryUITests: XCTestCase {
 
     private var homeChipBar: XCUIElement {
         app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'home.chipBar'"))
+            .matching(NSPredicate(format: "identifier == 'home.feed'"))
             .firstMatch
     }
 
     /// Navigate to the Library tab.
-    /// Tab order: Home=1, Search=2, Library=3, Settings=4 (each right press advances one tab).
-    /// Right × 2 from the default focus position opens Library (Home is already selected on launch,
-    /// so right × 1 = Search, right × 2 = Library; this aligns with Settings needing right × 4
-    /// where the first press activates the tab bar focus scope before advancing).
+    /// Tab order: Home, Search, Playlists, History, Library, Settings.
+    /// Four Right presses from Home reach Library.
     private func openLibrary() throws {
-        for _ in 0..<2 { remote.press(.right) }
+        for _ in 0..<4 { remote.press(.right) }
         remote.press(.select)
         Thread.sleep(forTimeInterval: 1.5)
         guard chipBar.waitForExistence(timeout: 12) else {
@@ -90,38 +88,36 @@ final class TVLibraryUITests: XCTestCase {
         XCTAssertTrue(chipBar.exists, "library.chipBar must exist after openLibrary()")
     }
 
-    /// The History chip must be reachable via one right-press in the chip bar.
-    func testHistorySegmentFocusable() throws {
-        let historyChip = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'library.chip.history'"))
+    /// Recommended is the chip after Subs.
+    func testRecommendedSegmentFocusable() throws {
+        let recommendedChip = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'library.chip.recommended'"))
             .firstMatch
-        guard historyChip.waitForExistence(timeout: 5) else {
-            try captureAndSkip("library.chip.history not found in accessibility tree", in: app)
+        guard recommendedChip.waitForExistence(timeout: 5) else {
+            try captureAndSkip("library.chip.recommended not found in accessibility tree", in: app)
         }
         selectChip(rightPresses: 1)
-        XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting History chip")
+        XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting Recommended")
     }
 
-    /// After selecting History, the section must show video cards or remain on the Library screen.
-    func testHistoryShowsFeedOrEmptyState() throws {
+    /// After selecting Recommended, the section must show video cards or remain on the Library screen.
+    func testRecommendedShowsFeedOrEmptyState() throws {
         selectChip(rightPresses: 1)
-        // Either video cards appear, or the chip bar is still present (empty state still on Library screen).
         let hasCards = videoCardsPresent(timeout: 8)
         if !hasCards && !chipBar.exists {
             try captureAndSkip(
-                "History section shows neither video cards nor the Library chip bar — unexpected state", in: app)
+                "Recommended section shows neither video cards nor the Library chip bar — unexpected state", in: app)
         }
-        // If we get here, at least one of the two conditions is true.
-        XCTAssertTrue(hasCards || chipBar.exists, "History section must show content or remain on the Library screen")
+        XCTAssertTrue(hasCards || chipBar.exists, "Recommended must show content or remain on the Library screen")
     }
 
     /// The Subscriptions chip must be the default chip and focusable without right presses.
     func testSubscriptionsSegmentFocusable() throws {
         let subsChip = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'library.chip.subscriptions'"))
+            .matching(NSPredicate(format: "identifier == 'library.chip.subs'"))
             .firstMatch
         guard subsChip.waitForExistence(timeout: 5) else {
-            try captureAndSkip("library.chip.subscriptions not found in accessibility tree", in: app)
+            try captureAndSkip("library.chip.subs not found in accessibility tree", in: app)
         }
         selectChip(rightPresses: 0)
         XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting Subscriptions chip")
@@ -153,20 +149,20 @@ final class TVLibraryUITests: XCTestCase {
         guard playlistsChip.waitForExistence(timeout: 5) else {
             try captureAndSkip("library.chip.playlists not found in accessibility tree", in: app)
         }
-        selectChip(rightPresses: 2)
+        selectChip(rightPresses: 3)
         XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting Playlists chip")
     }
 
-    /// The Downloads chip must be reachable via four right-presses in the chip bar.
-    func testDownloadsSegmentFocusable() throws {
-        let downloadsChip = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'library.chip.downloads'"))
+    /// Channels replaces the Downloads chip on tvOS.
+    func testChannelsSegmentFocusable() throws {
+        let channelsChip = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'library.chip.channels'"))
             .firstMatch
-        guard downloadsChip.waitForExistence(timeout: 5) else {
-            try captureAndSkip("library.chip.downloads not found in accessibility tree", in: app)
+        guard channelsChip.waitForExistence(timeout: 5) else {
+            try captureAndSkip("library.chip.channels not found in accessibility tree", in: app)
         }
-        selectChip(rightPresses: 4)
-        XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting Downloads chip")
+        selectChip(rightPresses: 2)
+        XCTAssertTrue(chipBar.exists, "library.chipBar must still exist after selecting Channels")
     }
 
     /// Pressing Menu from Library must dismiss the tab and restore the Home chip bar.
@@ -175,9 +171,9 @@ final class TVLibraryUITests: XCTestCase {
         remote.press(.menu)
         Thread.sleep(forTimeInterval: 1.5)
         guard homeChipBar.waitForExistence(timeout: 10) else {
-            try captureAndSkip("home.chipBar did not reappear after pressing Menu from Library", in: app)
+            try captureAndSkip("home.feed did not reappear after pressing Menu from Library", in: app)
         }
-        XCTAssertTrue(homeChipBar.exists, "home.chipBar must reappear after returning from Library")
+        XCTAssertTrue(homeChipBar.exists, "home.feed must reappear after returning from Library")
     }
 }
 #endif

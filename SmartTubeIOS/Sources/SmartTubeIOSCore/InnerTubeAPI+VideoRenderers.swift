@@ -574,9 +574,9 @@ extension InnerTubeAPI {
         // percentWatched: thumbnailOverlays[].thumbnailOverlayResumePlaybackRenderer.percentDurationWatched
         // (same path as WEB, used for watch-again resume)
         let watchProgress: Double? = overlays?.compactMap {
-            ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])
-                .flatMap { $0["percentDurationWatched"] as? Double }
-        }.first.map { $0 / 100.0 }
+            parsePercentDurationWatched(
+                ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])?["percentDurationWatched"])
+        }.first
 
         // isLive: thumbnailOverlay style == "LIVE" — Android: TileItem.isLive()
         let isLive =
@@ -1053,10 +1053,10 @@ extension InnerTubeAPI {
 
         let watchProgress: Double? = (r["thumbnailOverlays"] as? [[String: Any]])?
             .compactMap {
-                ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])
-                    .flatMap { $0["percentDurationWatched"] as? Double }
+                parsePercentDurationWatched(
+                    ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])?["percentDurationWatched"])
             }
-            .first.map { $0 / 100.0 }
+            .first
 
         // Parse feed feedback tokens keyed by icon type from the video's menuRenderer.
         // All three actions share the /feedback endpoint — only the token differs.
@@ -1154,10 +1154,10 @@ extension InnerTubeAPI {
 
         let watchProgress: Double? = (r["thumbnailOverlays"] as? [[String: Any]])?
             .compactMap {
-                ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])
-                    .flatMap { $0["percentDurationWatched"] as? Double }
+                parsePercentDurationWatched(
+                    ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])?["percentDurationWatched"])
             }
-            .first.map { $0 / 100.0 }
+            .first
 
         // isShort: apply same 4 signals as parseVideoRenderer (BUG-019 fix).
         // playlistVideoRenderer items appear in Home, Subscriptions, and History feeds

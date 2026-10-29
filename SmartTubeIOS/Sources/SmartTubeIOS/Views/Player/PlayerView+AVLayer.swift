@@ -79,6 +79,7 @@ struct PlayerAVLayerView: UIViewRepresentable {
 
     final class _PlayerUIView: UIView {
         override static var layerClass: AnyClass { AVPlayerLayer.self }
+        override var canBecomeFocused: Bool { false }
         var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
         var onLayerReady: ((AVPlayerLayer) -> Void)?
         private var didFireCallback = false

@@ -40,7 +40,7 @@ final class TVPlayerControlsUITests: XCTestCase {
 
     private var chipBar: XCUIElement {
         app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'home.chipBar'"))
+            .matching(NSPredicate(format: "identifier == 'home.feed'"))
             .firstMatch
     }
 
@@ -58,7 +58,7 @@ final class TVPlayerControlsUITests: XCTestCase {
     /// With --uitesting-open-more-menu the player will open the more menu automatically on appear.
     private func openPlayer() throws {
         guard chipBar.waitForExistence(timeout: 15) else {
-            try captureAndSkip("home.chipBar not found — app did not reach Home tab", in: app)
+            try captureAndSkip("home.feed not found — app did not reach Home tab", in: app)
         }
         // Wait for at least one video card so we can navigate into it.
         let predicate = NSPredicate(format: "identifier BEGINSWITH 'video.card.'")
@@ -312,6 +312,19 @@ final class TVPlayerControlsUITests: XCTestCase {
         XCTAssertTrue(
             titleLabel.waitForExistence(timeout: 5),
             "#150 regression: player.titleLabel must still exist after pressing Menu to close description panel")
+    }
+
+    /// Speed, captions, and quality sit in the top HUD row. Like and dislike appear when signed in.
+    func testHUDTransportButtonsExist() throws {
+        for identifier in ["player.speedButton", "player.captionsButton", "player.qualityButton"] {
+            let button = element(identifier: identifier)
+            XCTAssertTrue(button.waitForExistence(timeout: 8), "\(identifier) must exist in the player HUD")
+        }
+        let like = element(identifier: "player.likeButton")
+        if like.waitForExistence(timeout: 2) {
+            XCTAssertTrue(
+                element(identifier: "player.dislikeButton").exists, "player.dislikeButton must exist with Like")
+        }
     }
 }
 #endif

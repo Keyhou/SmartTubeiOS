@@ -52,6 +52,10 @@ public final class WatchtimeTracker {
     private var didReportFinal = false
     /// Throttle state for `checkpointIfDue`.
     private var lastCheckpointAt: Date?
+    /// Set when playback-started was sent before account-bound tracking URLs arrived.
+    private var playbackStartedWithoutAccountSession = false
+    private var lastReportedPosition: TimeInterval = 0
+    private var lastReportedDuration: TimeInterval = 0
 
     // MARK: - Init
 
@@ -94,6 +98,9 @@ public final class WatchtimeTracker {
         recordOpenedAt = nil
         didReportFinal = false
         lastCheckpointAt = nil
+        playbackStartedWithoutAccountSession = false
+        lastReportedPosition = 0
+        lastReportedDuration = 0
 
         trackerLog.notice(
             "transition: \(oldVideoId, privacy: .public) → \(newVideoId, privacy: .public) cpn=\(newCPN.prefix(8), privacy: .public)…"
@@ -126,11 +133,28 @@ public final class WatchtimeTracker {
     /// Store authenticated tracking URLs once they resolve in `loadAsync`.
     /// Safe to call any time between `transition` and the first `checkpoint`.
     public func setTrackingURLs(_ urls: PlaybackTrackingURLs?) {
+        let hadSession = hasTrackingSession
         trackingURLs = urls
-        let hasSession = InnerTubeAPI.trackingSession(from: urls) != nil
+        let hasSession = hasTrackingSession
         trackerLog.notice(
             "setTrackingURLs: \(urls != nil ? "received" : "nil", privacy: .public) accountBound=\(hasSession, privacy: .public)"
         )
+        // The first playback-started ping can go out on fallback URLs. Once the
+        // account-bound URLs arrive, send that ping again. Do not send a watchtime
+        // segment here — a zero-length st == et is ignored by YouTube.
+        guard !hadSession, hasSession, playbackStartedWithoutAccountSession, lastReportedDuration > 0 else { return }
+        playbackStartedWithoutAccountSession = false
+        let vid = videoId
+        let localCPN = cpn
+        let localURLs = trackingURLs
+        let duration = lastReportedDuration
+        let position = lastReportedPosition
+        let start = segmentStart ?? Self.initialSegmentStart(for: position)
+        Task { [api] in
+            await api.reportPlaybackStarted(
+                videoId: vid, cpn: localCPN, trackingURLs: localURLs,
+                lengthSeconds: duration, startPosition: start, final: false)
+        }
     }
 
     /// Indicates whether the tracker has the session parameters required by YouTube.
@@ -216,7 +240,13 @@ public final class WatchtimeTracker {
 
         await VideoStateStore.shared.save(videoId: vid, position: position, duration: duration)
 
+        lastReportedPosition = position
+        lastReportedDuration = duration
+
         if needsNewRecord || isFinal {
+            if !hasTrackingSession {
+                playbackStartedWithoutAccountSession = true
+            }
             trackerLog.notice(
                 "checkpoint: opening watch record videoId=\(vid, privacy: .public) cmt=\(Int(position))s final=\(isFinal, privacy: .public)"
             )
@@ -238,7 +268,9 @@ public final class WatchtimeTracker {
 
     /// Flushes the segment before a seek and starts the next segment at the target.
     /// This mirrors Android SmartTube's onSeekPositionChanged history update.
-    public func recordSeek(to targetPosition: TimeInterval, from currentPosition: TimeInterval, duration: TimeInterval) async {
+    public func recordSeek(
+        to targetPosition: TimeInterval, from currentPosition: TimeInterval, duration: TimeInterval
+    ) async {
         guard !videoId.isEmpty, duration > 0 else { return }
         if didReportFinal {
             // Rewatching after the final ping (Loop replays via seekTo(0), or a seek back out of

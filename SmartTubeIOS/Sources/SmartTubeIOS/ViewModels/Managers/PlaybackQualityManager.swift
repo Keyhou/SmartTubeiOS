@@ -223,7 +223,11 @@ final class PlaybackQualityManager {
             }
             #endif
             if self.delegate?.playerInfo?.hlsURL != nil {
-                await self.reloadHLSItem(seekTo: savedTime, quality: quality)
+                if let format, shouldReloadUHDOutsideHLS(format, hlsHeights: Set(self.hlsVariantURLs.keys)) {
+                    await self.reloadDASHItem(seekTo: savedTime, format: format)
+                } else {
+                    await self.reloadHLSItem(seekTo: savedTime, quality: quality)
+                }
             } else {
                 await self.reloadDASHItem(seekTo: savedTime, format: format)
             }

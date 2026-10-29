@@ -77,6 +77,10 @@ public struct PlayerView: View {
     /// Which playback control is visually highlighted in the overlay.
     /// nil = not in controls-nav mode; all remote input targets the video layer.
     @State var highlightedControl: TVPlayerControl? = nil
+    /// Select presses inside this window after a picker closes are ignored.
+    @State var lastTVOverlayDismissTime: Date = .distantPast
+    @State var lastTVSelectTime: Date = .distantPast
+    @State var lastTVExitTime: Date = .distantPast
     /// Namespace for the player ZStack itself, used with `.focusScope` +
     /// `.prefersDefaultFocus` so the ZStack claims default focus when pushed via
     /// NavigationStack — preventing any child view from stealing focus first.

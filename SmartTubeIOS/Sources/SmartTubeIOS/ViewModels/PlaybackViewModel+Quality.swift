@@ -48,4 +48,23 @@ extension PlaybackViewModel {
     func reloadHLSItemH264Capped(seekTo time: TimeInterval) async {
         await qualityManager.reloadHLSItemH264Capped(seekTo: time)
     }
+
+    /// After visionOS H.264 HLS (capped at 1080p) is already playing, add rqh-free
+    /// 1440p/2160p MP4 rows from Android VR without replacing the current item.
+    func enrichPickerWithUHDFormats(for videoId: String) async {
+        do {
+            let info = try await api.fetchPlayerInfoAndroidVR(videoId: videoId)
+            guard currentVideo?.id == videoId else { return }
+            let extras = info.formats.filter { format in
+                guard format.isUHDPlayableOutsideHLS, let url = format.url else { return false }
+                return !PlaybackQualityManager.urlHasRqhEnforcement(url)
+            }
+            guard !extras.isEmpty else { return }
+            let heights = Set(hlsVariantURLs.keys).union(availableFormats.map(\.height))
+            availableFormats = qualityPickerFormats(formats: availableFormats + extras, hlsHeights: heights)
+            qualityLog.notice("[uhd] picker enriched with \(extras.count) Android VR formats")
+        } catch {
+            qualityLog.notice("[uhd] Android VR picker enrichment failed — leaving the picker unchanged")
+        }
+    }
 }

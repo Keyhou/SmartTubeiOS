@@ -25,27 +25,35 @@ public struct LibraryView: View {
     #endif
     #if os(tvOS)
     @FocusState private var focusedSection: LibrarySection?
+    @FocusState private var queueRowFocused: Bool
     #endif
 
     enum LibrarySection: String, CaseIterable, Identifiable {
         case subscriptions = "Subs"
+        case recommended = "Recommended"
+        case channels = "Channels"
         case history = "History"
         case playlists = "Playlists"
         case rss = "RSS Feeds"
         case downloads = "Downloads"
 
-        #if os(tvOS) || !ENABLE_DOWNLOADS
-        // Downloads saves to Photos library — not supported on tvOS, and compiled out of
-        // App Store builds (guideline 5.2.3). Exclude the chip by hiding it from allCases.
         static var allCases: [LibrarySection] {
+            #if os(tvOS)
+            // History is its own tab. Downloads stay off tvOS.
+            [.subscriptions, .recommended, .channels, .playlists, .rss]
+            #elseif ENABLE_DOWNLOADS
+            [.subscriptions, .history, .playlists, .rss, .downloads]
+            #else
             [.subscriptions, .history, .playlists, .rss]
+            #endif
         }
-        #endif
 
         var id: String { rawValue }
         var browseSectionType: BrowseSection.SectionType {
             switch self {
             case .subscriptions: return .subscriptions
+            case .recommended: return .recommended
+            case .channels: return .channels
             case .history: return .history
             case .playlists: return .playlists
             case .rss: return .history  // not used — RSS renders its own view
@@ -86,6 +94,7 @@ public struct LibraryView: View {
             HStack(spacing: 8) {
                 ForEach(LibrarySection.allCases) { sec in
                     let isSelected = selectedSection == sec
+                    let isFocused = focusedSection == sec
                     Button {
                         guard selectedSection != sec else { return }
                         selectedSection = sec
@@ -95,15 +104,16 @@ public struct LibraryView: View {
                             .padding(.horizontal, 24)
                             .padding(.vertical, 12)
                             .background(
-                                (isSelected || focusedSection == sec) ? Color.primary : Color.secondary.opacity(0.15),
+                                isFocused
+                                    ? TVFocusStyle.color
+                                    : (isSelected ? Color.primary : Color.secondary.opacity(0.15)),
                                 in: Capsule()
                             )
-                            .foregroundStyle(
-                                (isSelected || focusedSection == sec) ? Color(white: 0) : Color.primary
-                            )
+                            .foregroundStyle((isFocused || isSelected) ? Color.black : Color.primary)
                     }
-                    .buttonStyle(.borderless)
-                    .scaleEffect(focusedSection == sec ? 1.12 : 1.0)
+                    .buttonStyle(TVImmediateSelectButtonStyle())
+                    .focusEffectDisabled()
+                    .scaleEffect(isFocused ? 1.04 : 1.0)
                     .animation(.easeInOut(duration: 0.15), value: focusedSection)
                     .animation(.easeInOut(duration: 0.15), value: selectedSection)
                     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -135,6 +145,10 @@ public struct LibraryView: View {
                     RSSFeedsView()
                 } else if selectedSection == .downloads {
                     downloadsContent
+                } else if selectedSection == .channels {
+                    ChannelListView(channels: browseVM.subscribedChannels) { channel in
+                        channelDestination = ChannelDestination(channelId: channel.id)
+                    }
                 } else if !auth.isSignedIn && selectedSection != .subscriptions {
                     segmentSignInPrompt
                 } else if browseVM.isLoading && browseVM.videoGroups.flatMap({ $0.videos }).isEmpty {
@@ -280,6 +294,9 @@ public struct LibraryView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
+        #if os(tvOS)
+        .tvFocusRowChrome(isFocused: queueRowFocused)
+        #endif
         .onTapGesture {
             selectedPlaylist = Video(
                 id: CurrentQueueStore.playlistID,
@@ -287,6 +304,22 @@ public struct LibraryView: View {
                 channelTitle: ""
             )
         }
+        #if os(tvOS)
+        .background {
+            Button {
+                selectedPlaylist = Video(
+                    id: CurrentQueueStore.playlistID,
+                    title: "Current Queue",
+                    channelTitle: ""
+                )
+            } label: {
+                Color.clear.contentShape(Rectangle())
+            }
+            .buttonStyle(TVImmediateSelectButtonStyle())
+            .focusEffectDisabled()
+            .focused($queueRowFocused)
+        }
+        #endif
         .accessibilityIdentifier("library.currentQueueRow")
         Divider().padding(.horizontal)
     }

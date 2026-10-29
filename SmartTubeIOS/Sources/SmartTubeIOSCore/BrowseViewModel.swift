@@ -515,7 +515,10 @@ public final class BrowseViewModel {
 
         case .shorts:
             let group = try await api.fetchShorts()
-            if !Task.isCancelled { videoGroups = group.videos.isEmpty ? [] : [group] }
+            if !Task.isCancelled {
+                let shorts = Self.shortsOnly(group)
+                videoGroups = shorts.videos.isEmpty ? [] : [shorts]
+            }
 
         case .music:
             let group = try await api.fetchMusic()
@@ -700,7 +703,7 @@ public final class BrowseViewModel {
                     browseLog.notice("fetchNextPage cancelled: section=\(section.title)")
                 } else {
                     let before = videoGroups.first?.videos.count ?? 0
-                    mergeIntoFirstGroup(group)
+                    mergeIntoFirstGroup(Self.shortsOnly(group))
                     let after = videoGroups.first?.videos.count ?? 0
                     let added = after - before
                     browseLog.notice(
@@ -791,6 +794,17 @@ public final class BrowseViewModel {
                 self.error = error
             }
         }
+    }
+
+    /// The dedicated Shorts shelf drops ordinary videos the Shorts endpoint sometimes returns.
+    private static func shortsOnly(_ group: VideoGroup) -> VideoGroup {
+        VideoGroup(
+            title: group.title,
+            videos: group.videos.filter(\.isShort),
+            nextPageToken: group.nextPageToken,
+            action: group.action,
+            layout: group.layout
+        )
     }
 
     /// Appends `group.videos` into `videoGroups[0]` and updates its pagination token.

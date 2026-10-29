@@ -471,6 +471,8 @@ final class TOSPlayerViewModel: NSObject {
     /// Called from `TOSPlayerView.onAppear`. Mirrors `PlaybackViewModel.updateSettings(_:)`.
     func updateSettings(_ newSettings: AppSettings) {
         settings = newSettings
+        settings.playbackSpeed = newSettings.resolvedPlaybackSpeed(for: channelId)
+        settings.preferredCaptionLanguage = newSettings.resolvedCaptionLanguage(for: channelId)
     }
 
     // MARK: - Lifecycle
